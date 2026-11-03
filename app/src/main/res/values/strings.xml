@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright © 2026 DarkSkullCorporation
+  ~ Developer: Naveed Mushtaq
+  ~
+  ~ Forked from VLC for Android — Copyright © 2011-2026 VLC authors and VideoLAN
+  ~ Licensed under the GNU General Public License v2 or later (GPLv2+).
+  -->
+<resources>
+    <string name="app_name">PLayMuse</string>
+    <string name="app_package_id">com.dsc.playmuse</string>
+    <string name="developer_name">Naveed Mushtaq</string>
+    <string name="copyright_holder">DarkSkullCorporation</string>
+    <string name="copyright_notice">Copyright © 2026 DarkSkullCorporation</string>
+    <string name="about_playmuse_title">About PLayMuse</string>
+    <string name="about_playmuse_description">PLayMuse is a modern cross-format multimedia and music player for Android developed by Naveed Mushtaq under DarkSkullCorporation.</string>
+    <string name="upstream_vlc_attribution"></string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "PLayMuse",
+  "description": "PLayMuse media player for Android by DarkSkullCorporation (Naveed Mushtaq), forked from VideoLAN VLC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
