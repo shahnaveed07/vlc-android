@@ -25,7 +25,7 @@ class MediaRepository(private val context: Context) {
     private val sampleVideos = listOf(
         MediaItem(
             id = "sample_video_1",
-            title = "Big Buck Bunny (HLS Live Stream)",
+            title = "Big Buck Bunny (HLS Stream)",
             artist = "Blender Foundation",
             album = "Open Movie",
             durationMs = 596000L,
@@ -37,35 +37,35 @@ class MediaRepository(private val context: Context) {
         ),
         MediaItem(
             id = "sample_video_2",
-            title = "Tears of Steel (Sci-Fi Short)",
-            artist = "Mango Open Movie Project",
-            album = "Blender 4K",
-            durationMs = 734000L,
-            uri = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-            mediaType = MediaType.VIDEO,
-            thumbnailUri = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80",
-            sizeBytes = 224000000L,
-            resolution = "4K Ultra HD"
-        ),
-        MediaItem(
-            id = "sample_video_3",
             title = "Sintel Animated Trailer",
             artist = "Durian Open Movie Project",
             album = "Blender Animation",
             durationMs = 52000L,
-            uri = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+            uri = "https://media.w3.org/2010/05/sintel/trailer.mp4",
             mediaType = MediaType.VIDEO,
             thumbnailUri = "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=600&auto=format&fit=crop&q=80",
             sizeBytes = 42000000L,
             resolution = "1080p HD"
         ),
         MediaItem(
+            id = "sample_video_3",
+            title = "Big Buck Bunny Trailer",
+            artist = "Blender Foundation",
+            album = "Blender HD",
+            durationMs = 33000L,
+            uri = "https://media.w3.org/2010/05/bunny/trailer.mp4",
+            mediaType = MediaType.VIDEO,
+            thumbnailUri = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80",
+            sizeBytes = 25000000L,
+            resolution = "720p HD"
+        ),
+        MediaItem(
             id = "sample_video_4",
-            title = "We Are Going On Bullrun",
-            artist = "Automotive Cinema",
-            album = "Speed Series",
-            durationMs = 47000L,
-            uri = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
+            title = "Tears of Steel Preview",
+            artist = "Mango Open Movie Project",
+            album = "Sci-Fi Cinema",
+            durationMs = 32000L,
+            uri = "https://media.w3.org/2010/05/video/movie_300.mp4",
             mediaType = MediaType.VIDEO,
             thumbnailUri = "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&auto=format&fit=crop&q=80",
             sizeBytes = 38000000L,
@@ -73,11 +73,11 @@ class MediaRepository(private val context: Context) {
         ),
         MediaItem(
             id = "sample_video_5",
-            title = "For Bigger Blazes (Nature)",
-            artist = "Chromecast Showreel",
-            album = "Earth Documentary",
-            durationMs = 15000L,
-            uri = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+            title = "Car & Traffic Cinema Demo",
+            artist = "Open Motion Project",
+            album = "HD Showreel",
+            durationMs = 28000L,
+            uri = "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
             mediaType = MediaType.VIDEO,
             thumbnailUri = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&auto=format&fit=crop&q=80",
             sizeBytes = 18000000L,
@@ -140,11 +140,11 @@ class MediaRepository(private val context: Context) {
     // Pre-curated working public internet streams
     private val curatedStreams = mutableListOf(
         StreamBookmark("Big Buck Bunny HLS Live", "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "HLS Video"),
-        StreamBookmark("NASA TV / Live Space Stream", "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8", "Live TV"),
+        StreamBookmark("Sintel Animation Trailer", "https://media.w3.org/2010/05/sintel/trailer.mp4", "Direct Video"),
+        StreamBookmark("Big Buck Bunny Trailer", "https://media.w3.org/2010/05/bunny/trailer.mp4", "Direct Video"),
         StreamBookmark("SomaFM Indie Pop Rocks (Radio)", "https://ice1.somafm.com/indiepop-128-mp3", "Web Radio"),
         StreamBookmark("SomaFM Groove Salad (Ambient)", "https://ice1.somafm.com/groovesalad-128-mp3", "Web Radio"),
-        StreamBookmark("Classic Rock Florida HD", "https://stream.rockradio.com:80/classicrock", "Web Radio"),
-        StreamBookmark("Tears of Steel 1080p MP4 Direct", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4", "Direct Video")
+        StreamBookmark("SomaFM Drone Zone (Atmospheric)", "https://ice4.somafm.com/dronezone-128-mp3", "Web Radio")
     )
 
     // Equalizer presets

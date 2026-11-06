@@ -14,10 +14,15 @@ import android.media.audiofx.Virtualizer
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem as ExoMediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,14 +35,30 @@ import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.MediaType
 import org.videolan.vlc.model.RepeatMode
 
+@OptIn(UnstableApi::class)
 class VlcPlayerController(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.Main)
-    var exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
+
+    private val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+        .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 PLayMuse/3.6.0")
+        .setConnectTimeoutMs(15000)
+        .setReadTimeoutMs(15000)
+        .setAllowCrossProtocolRedirects(true)
+
+    private val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+    private val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+    var exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .build()
         private set
 
     private val _currentMedia = MutableStateFlow<MediaItem?>(null)
     val currentMedia: StateFlow<MediaItem?> = _currentMedia.asStateFlow()
+
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
@@ -92,15 +113,39 @@ class VlcPlayerController(private val context: Context) {
         exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 _isPlaying.value = playing
+                if (playing) {
+                    _playbackError.value = null
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
                     _duration.value = exoPlayer.duration.coerceAtLeast(0L)
+                    _playbackError.value = null
                     initAudioEffects(exoPlayer.audioSessionId)
                 } else if (playbackState == Player.STATE_ENDED) {
                     playNext()
                 }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val cause = error.cause
+                val message = when {
+                    cause is HttpDataSource.InvalidResponseCodeException -> {
+                        when (cause.responseCode) {
+                            403 -> "Stream access forbidden (HTTP 403). The server requires authentication or has restricted this stream."
+                            404 -> "Media stream not found (HTTP 404). Please verify the stream URL."
+                            500, 502, 503 -> "Media server error (${cause.responseCode}). Please try again shortly."
+                            else -> "Network error (HTTP ${cause.responseCode}). Unable to load stream."
+                        }
+                    }
+                    cause is HttpDataSource.HttpDataSourceException -> {
+                        "Network connection failed. Unable to connect to media host."
+                    }
+                    else -> error.message ?: "Playback error encountered."
+                }
+                _playbackError.value = message
+                _isPlaying.value = false
             }
         })
     }
@@ -145,6 +190,7 @@ class VlcPlayerController(private val context: Context) {
     }
 
     fun playMedia(item: MediaItem, queue: List<MediaItem>? = null) {
+        _playbackError.value = null
         _currentMedia.value = item
         if (queue != null && queue.isNotEmpty()) {
             _playlist.value = queue
@@ -160,6 +206,16 @@ class VlcPlayerController(private val context: Context) {
         }
         exoPlayer.play()
         _isPlaying.value = true
+    }
+
+    fun retry() {
+        val current = _currentMedia.value ?: return
+        _playbackError.value = null
+        playMedia(current, _playlist.value)
+    }
+
+    fun clearPlaybackError() {
+        _playbackError.value = null
     }
 
     fun playQueue(items: List<MediaItem>, startIndex: Int = 0) {

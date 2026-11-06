@@ -8,12 +8,14 @@
 package org.videolan.vlc.ui.audio
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -55,6 +57,7 @@ fun NowPlayingScreen(
     val repeatMode by playerController.repeatMode.collectAsState()
     val isShuffle by playerController.isShuffle.collectAsState()
     val sleepSeconds by playerController.sleepTimerSeconds.collectAsState()
+    val playbackError by playerController.playbackError.collectAsState()
 
     BackHandler {
         onClose()
@@ -115,6 +118,47 @@ fun NowPlayingScreen(
                         contentDescription = "Equalizer",
                         tint = VlcOrangePrimary
                     )
+                }
+            }
+
+            // Error Banner if playback failed
+            AnimatedVisibility(
+                visible = playbackError != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WarningAmber,
+                            contentDescription = "Error",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = playbackError ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2
+                        )
+                        TextButton(
+                            onClick = { playerController.retry() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Retry", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
 

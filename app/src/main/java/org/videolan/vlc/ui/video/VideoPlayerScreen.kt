@@ -67,6 +67,7 @@ fun VideoPlayerScreen(
     val currentPosition by playerController.currentPosition.collectAsState()
     val duration by playerController.duration.collectAsState()
     val playbackSpeed by playerController.playbackSpeed.collectAsState()
+    val playbackError by playerController.playbackError.collectAsState()
 
     var showControls by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
@@ -243,6 +244,71 @@ fun VideoPlayerScreen(
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp))
                         )
+                    }
+                }
+            }
+        }
+
+        // Playback Error Overlay
+        AnimatedVisibility(
+            visible = playbackError != null,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 8.dp,
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WarningAmber,
+                        contentDescription = "Playback Error",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Text(
+                        text = "Unable to Stream Media",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = playbackError ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                playerController.clearPlaybackError()
+                                onClose()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Close")
+                        }
+                        Button(
+                            onClick = { playerController.retry() },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = VlcOrangePrimary),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Retry", color = Color.White)
+                        }
                     }
                 }
             }

@@ -81,6 +81,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
     val isPlaying by viewModel.playerController.isPlaying.collectAsState()
     val currentPosition by viewModel.playerController.currentPosition.collectAsState()
     val duration by viewModel.playerController.duration.collectAsState()
+    val playbackError by viewModel.playerController.playbackError.collectAsState()
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isGridMode by viewModel.isGridMode.collectAsState()
@@ -93,6 +94,23 @@ fun MainAppContent(viewModel: VlcViewModel) {
     val currentBrowsePath by viewModel.currentBrowsePath.collectAsState()
     val browseFiles by viewModel.browseFiles.collectAsState()
     val settings by viewModel.settings.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(playbackError) {
+        val error = playbackError
+        if (error != null) {
+            val result = snackbarHostState.showSnackbar(
+                message = error,
+                actionLabel = "Retry",
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.playerController.retry()
+            }
+            viewModel.playerController.clearPlaybackError()
+        }
+    }
 
     // Request permissions for local media
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -122,6 +140,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (!isFullScreenVideo && !isNowPlayingExpanded && activeModal == ActiveModal.NONE) {
                 VlcTopBar(
