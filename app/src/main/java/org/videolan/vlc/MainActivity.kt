@@ -307,6 +307,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
             aspectRatioMode = aspectRatioMode,
             onCycleAspectRatio = { viewModel.cycleAspectRatio() },
             onOpenSpeed = { viewModel.showModal(ActiveModal.PLAYBACK_SPEED) },
+            onOpenSleepTimer = { viewModel.showModal(ActiveModal.SLEEP_TIMER) },
             onOpenEqualizer = { viewModel.showModal(ActiveModal.EQUALIZER) },
             onClose = { viewModel.setFullScreenVideo(false) }
         )

@@ -25,8 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,11 +36,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.videolan.vlc.R
 import org.videolan.vlc.model.RepeatMode
+import org.videolan.vlc.model.formatPlaybackDuration
+import org.videolan.vlc.model.formatSleepTimerCountdown
 import org.videolan.vlc.player.VlcPlayerController
 import org.videolan.vlc.theme.PlayMuseElevatedSurfaceDark
 import org.videolan.vlc.theme.PlayMuseGoldPrimary
 import org.videolan.vlc.theme.PlayMuseOutlineDark
 import org.videolan.vlc.theme.PlayMuseSurfaceDark
+import org.videolan.vlc.ui.modals.AbSegmentSeekBarIndicators
+import org.videolan.vlc.ui.modals.PlaybackOptionsSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,8 +65,21 @@ fun NowPlayingScreen(
     val sleepSeconds by playerController.sleepTimerSeconds.collectAsState()
     val playbackError by playerController.playbackError.collectAsState()
 
+    val abPointAMs by playerController.abPointAMs.collectAsState()
+    val abPointBMs by playerController.abPointBMs.collectAsState()
+    val isAbLoopActive by playerController.isAbLoopActive.collectAsState()
+    val abLoopStatusMessage by playerController.abLoopStatusMessage.collectAsState()
+    val abLoopErrorMessage by playerController.abLoopErrorMessage.collectAsState()
+    val isMediaSeekable by playerController.isCurrentMediaSeekable.collectAsState()
+
+    var showPlaybackOptions by remember { mutableStateOf(false) }
+
     BackHandler {
-        onClose()
+        if (showPlaybackOptions) {
+            showPlaybackOptions = false
+        } else {
+            onClose()
+        }
     }
 
     // Vinyl rotation animation when playing
@@ -114,12 +131,24 @@ fun NowPlayingScreen(
                     )
                 )
 
-                IconButton(onClick = onOpenEqualizer) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = "Equalizer",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenEqualizer) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = "Equalizer",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(
+                        onClick = { showPlaybackOptions = true },
+                        modifier = Modifier.testTag("audio_playback_options_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Playback Options",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
@@ -261,12 +290,18 @@ fun NowPlayingScreen(
                 }
             }
 
-            // Scrubber Slider & Timers
+            // Scrubber Slider, A-B Markers & Timers
             Column(modifier = Modifier.fillMaxWidth()) {
-                val posSec = currentPosition / 1000
-                val durSec = duration / 1000
-                val posFormatted = String.format("%02d:%02d", (posSec % 3600) / 60, posSec % 60)
-                val durFormatted = String.format("%02d:%02d", (durSec % 3600) / 60, durSec % 60)
+                AbSegmentSeekBarIndicators(
+                    pointAMs = abPointAMs,
+                    pointBMs = abPointBMs,
+                    durationMs = duration,
+                    isLoopActive = isAbLoopActive,
+                    onClearLoop = { playerController.clearAbLoop() }
+                )
+
+                val posFormatted = formatPlaybackDuration(currentPosition, allowZero = true)
+                val durFormatted = formatPlaybackDuration(duration, allowZero = true)
 
                 Slider(
                     value = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,
@@ -288,11 +323,13 @@ fun NowPlayingScreen(
                 ) {
                     Text(
                         text = posFormatted,
-                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                        modifier = Modifier.testTag("audio_position_text")
                     )
                     Text(
                         text = durFormatted,
-                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                        modifier = Modifier.testTag("audio_duration_text")
                     )
                 }
             }
@@ -369,7 +406,7 @@ fun NowPlayingScreen(
                 }
             }
 
-            // Secondary Controls (Speed, Sleep timer)
+            // Secondary Controls (Speed, Sleep timer, A-B Repeat / Options)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -377,7 +414,10 @@ fun NowPlayingScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                TextButton(onClick = onOpenSpeed) {
+                TextButton(
+                    onClick = onOpenSpeed,
+                    modifier = Modifier.testTag("audio_speed_button")
+                ) {
                     Icon(
                         imageVector = Icons.Default.Speed,
                         contentDescription = null,
@@ -391,7 +431,10 @@ fun NowPlayingScreen(
                     )
                 }
 
-                TextButton(onClick = onOpenSleepTimer) {
+                TextButton(
+                    onClick = onOpenSleepTimer,
+                    modifier = Modifier.testTag("audio_sleep_timer_button")
+                ) {
                     Icon(
                         imageVector = Icons.Default.Timer,
                         contentDescription = null,
@@ -400,13 +443,67 @@ fun NowPlayingScreen(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (sleepSeconds != null) "${sleepSeconds!! / 60}m" else "Sleep Timer",
+                        text = if (sleepSeconds != null && sleepSeconds!! > 0) {
+                            formatSleepTimerCountdown(sleepSeconds!!)
+                        } else {
+                            "Sleep Timer"
+                        },
                         style = MaterialTheme.typography.labelMedium.copy(
                             color = if (sleepSeconds != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.testTag("audio_sleep_timer_label")
+                    )
+                }
+
+                TextButton(
+                    onClick = { showPlaybackOptions = true },
+                    modifier = Modifier.testTag("audio_ab_options_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isAbLoopActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isAbLoopActive) "A–B Loop" else "Options",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = if (isAbLoopActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
             }
         }
+    }
+
+    if (showPlaybackOptions) {
+        PlaybackOptionsSheet(
+            isVideoMode = false,
+            playbackSpeed = playbackSpeed,
+            sleepTimerSeconds = sleepSeconds,
+            pointAMs = abPointAMs,
+            pointBMs = abPointBMs,
+            isAbLoopActive = isAbLoopActive,
+            abLoopStatusMessage = abLoopStatusMessage,
+            abLoopErrorMessage = abLoopErrorMessage,
+            isMediaSeekable = isMediaSeekable,
+            onSetPointA = { playerController.setPointA() },
+            onSetPointB = { playerController.setPointB() },
+            onActivateAbLoop = { playerController.activateAbLoop() },
+            onClearAbLoop = { playerController.clearAbLoop() },
+            onOpenSpeed = onOpenSpeed,
+            onOpenSleepTimer = onOpenSleepTimer,
+            onOpenEqualizer = onOpenEqualizer,
+            isShuffle = isShuffle,
+            repeatMode = repeatMode,
+            onToggleShuffle = { playerController.toggleShuffle() },
+            onToggleRepeatMode = { playerController.toggleRepeatMode() },
+            isPlaying = isPlaying,
+            onPreviousTrack = { playerController.playPrevious() },
+            onTogglePlayPause = { playerController.togglePlayPause() },
+            onNextTrack = { playerController.playNext() },
+            onDismiss = { showPlaybackOptions = false }
+        )
     }
 }

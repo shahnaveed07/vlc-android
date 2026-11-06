@@ -7,6 +7,8 @@
  */
 package org.videolan.vlc.model
 
+import java.util.Locale
+
 enum class MediaType {
     VIDEO,
     AUDIO
@@ -26,6 +28,91 @@ enum class AspectRatioMode(val label: String) {
     RATIO_4_3("4:3")
 }
 
+/**
+ * Shared hour-aware playback duration formatter used across audio, video, and media items.
+ * Examples:
+ * - 45_000L -> "00:45"
+ * - 599_000L -> "09:59"
+ * - 3_599_000L -> "59:59"
+ * - 3_600_000L -> "1:00:00"
+ * - 5_400_000L -> "1:30:00"
+ * - 43_540_000L -> "12:05:40"
+ */
+fun formatPlaybackDuration(durationMs: Long, allowZero: Boolean = true): String {
+    if (durationMs < 0L || (!allowZero && durationMs == 0L)) return "--:--"
+    val totalSeconds = durationMs / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0L) {
+        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    }
+}
+
+/**
+ * Formats remaining sleep timer seconds accurately so sub-minute values never display as "0m".
+ * Examples:
+ * - 942 -> "15:42"
+ * - 3930 -> "01:05:30"
+ */
+fun formatSleepTimerCountdown(totalSeconds: Int): String {
+    val safeSeconds = totalSeconds.coerceAtLeast(0)
+    val hours = safeSeconds / 3600
+    val minutes = (safeSeconds % 3600) / 60
+    val seconds = safeSeconds % 60
+    return if (hours > 0) {
+        String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    }
+}
+
+sealed class SleepTimerValidationResult {
+    data class Valid(val totalMinutes: Int) : SleepTimerValidationResult()
+    data class Invalid(val message: String) : SleepTimerValidationResult()
+}
+
+/**
+ * Validates custom sleep timer hours and minutes input.
+ * Minimum: 1 minute. Maximum: 24 hours (1440 minutes).
+ */
+fun validateCustomSleepTimerInput(hoursInput: String, minutesInput: String): SleepTimerValidationResult {
+    val trimmedHours = hoursInput.trim()
+    val trimmedMinutes = minutesInput.trim()
+
+    if (trimmedHours.isEmpty() && trimmedMinutes.isEmpty()) {
+        return SleepTimerValidationResult.Invalid("Enter hours or minutes (1 min to 24 hours).")
+    }
+
+    val hours = if (trimmedHours.isEmpty()) 0 else trimmedHours.toIntOrNull()
+    val minutes = if (trimmedMinutes.isEmpty()) 0 else trimmedMinutes.toIntOrNull()
+
+    if (hours == null || minutes == null) {
+        return SleepTimerValidationResult.Invalid("Please enter valid whole numbers.")
+    }
+
+    if (hours < 0 || minutes < 0) {
+        return SleepTimerValidationResult.Invalid("Duration cannot be negative.")
+    }
+
+    if (minutes >= 60 && trimmedHours.isNotEmpty() && hours > 0) {
+        return SleepTimerValidationResult.Invalid("Minutes must be between 0 and 59 when hours are specified.")
+    }
+
+    val totalMinutes = hours * 60 + minutes
+    if (totalMinutes < 1) {
+        return SleepTimerValidationResult.Invalid("Minimum sleep timer duration is 1 minute.")
+    }
+
+    if (totalMinutes > 24 * 60) {
+        return SleepTimerValidationResult.Invalid("Maximum sleep timer duration is 24 hours.")
+    }
+
+    return SleepTimerValidationResult.Valid(totalMinutes)
+}
+
 data class MediaItem(
     val id: String,
     val title: String,
@@ -41,18 +128,7 @@ data class MediaItem(
     val lastPositionMs: Long = 0L
 ) {
     val durationFormatted: String
-        get() {
-            if (durationMs <= 0) return "--:--"
-            val totalSeconds = durationMs / 1000
-            val hours = totalSeconds / 3600
-            val minutes = (totalSeconds % 3600) / 60
-            val seconds = totalSeconds % 60
-            return if (hours > 0) {
-                String.format("%d:%02d:%02d", hours, minutes, seconds)
-            } else {
-                String.format("%02d:%02d", minutes, seconds)
-            }
-        }
+        get() = formatPlaybackDuration(durationMs, allowZero = false)
 
     val sizeFormatted: String
         get() {
@@ -61,9 +137,9 @@ data class MediaItem(
             val mb = kb / 1024.0
             val gb = mb / 1024.0
             return when {
-                gb >= 1.0 -> String.format("%.1f GB", gb)
-                mb >= 1.0 -> String.format("%.1f MB", mb)
-                else -> String.format("%.0f KB", kb)
+                gb >= 1.0 -> String.format(Locale.US, "%.1f GB", gb)
+                mb >= 1.0 -> String.format(Locale.US, "%.1f MB", mb)
+                else -> String.format(Locale.US, "%.0f KB", kb)
             }
         }
 }

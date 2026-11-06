@@ -11,16 +11,12 @@ import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
 import android.view.ViewGroup
-import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,9 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,10 +42,13 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import org.videolan.vlc.model.AspectRatioMode
-import org.videolan.vlc.model.MediaItem
+import org.videolan.vlc.model.formatPlaybackDuration
+import org.videolan.vlc.model.formatSleepTimerCountdown
 import org.videolan.vlc.player.VlcPlayerController
 import org.videolan.vlc.theme.PlayMuseBackgroundDark
 import org.videolan.vlc.theme.PlayMuseGoldPrimary
+import org.videolan.vlc.ui.modals.AbSegmentSeekBarIndicators
+import org.videolan.vlc.ui.modals.PlaybackOptionsSheet
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -59,6 +57,7 @@ fun VideoPlayerScreen(
     aspectRatioMode: AspectRatioMode,
     onCycleAspectRatio: () -> Unit,
     onOpenSpeed: () -> Unit,
+    onOpenSleepTimer: () -> Unit = {},
     onOpenEqualizer: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -69,9 +68,18 @@ fun VideoPlayerScreen(
     val duration by playerController.duration.collectAsState()
     val playbackSpeed by playerController.playbackSpeed.collectAsState()
     val playbackError by playerController.playbackError.collectAsState()
+    val sleepSeconds by playerController.sleepTimerSeconds.collectAsState()
+
+    val abPointAMs by playerController.abPointAMs.collectAsState()
+    val abPointBMs by playerController.abPointBMs.collectAsState()
+    val isAbLoopActive by playerController.isAbLoopActive.collectAsState()
+    val abLoopStatusMessage by playerController.abLoopStatusMessage.collectAsState()
+    val abLoopErrorMessage by playerController.abLoopErrorMessage.collectAsState()
+    val isMediaSeekable by playerController.isCurrentMediaSeekable.collectAsState()
 
     var showControls by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
+    var showPlaybackOptions by remember { mutableStateOf(false) }
 
     // Gesture HUD indicators
     var hudText by remember { mutableStateOf<String?>(null) }
@@ -82,8 +90,8 @@ fun VideoPlayerScreen(
     val maxVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
     // Auto-hide controls timer
-    LaunchedEffect(showControls, isPlaying) {
-        if (showControls && isPlaying && !isLocked) {
+    LaunchedEffect(showControls, isPlaying, showPlaybackOptions) {
+        if (showControls && isPlaying && !isLocked && !showPlaybackOptions) {
             delay(4000)
             showControls = false
         }
@@ -100,7 +108,9 @@ fun VideoPlayerScreen(
     }
 
     BackHandler {
-        if (isLocked) {
+        if (showPlaybackOptions) {
+            showPlaybackOptions = false
+        } else if (isLocked) {
             isLocked = false
         } else {
             onClose()
@@ -114,11 +124,7 @@ fun VideoPlayerScreen(
             .pointerInput(isLocked) {
                 detectTapGestures(
                     onTap = {
-                        if (isLocked) {
-                            showControls = !showControls
-                        } else {
-                            showControls = !showControls
-                        }
+                        showControls = !showControls
                     },
                     onDoubleTap = { offset ->
                         if (!isLocked) {
@@ -191,7 +197,9 @@ fun VideoPlayerScreen(
                 }
             },
             update = { playerView ->
-                playerView.player = playerController.exoPlayer
+                if (playerView.player !== playerController.exoPlayer) {
+                    playerView.player = playerController.exoPlayer
+                }
                 playerView.resizeMode = when (aspectRatioMode) {
                     AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                     AspectRatioMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -199,6 +207,9 @@ fun VideoPlayerScreen(
                     AspectRatioMode.RATIO_16_9 -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
                     AspectRatioMode.RATIO_4_3 -> AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
                 }
+            },
+            onRelease = { playerView ->
+                playerView.player = null
             }
         )
 
@@ -277,7 +288,7 @@ fun VideoPlayerScreen(
                         modifier = Modifier.size(44.dp)
                     )
                     Text(
-                        text = "Unable to Stream Media",
+                        text = "Unable to Play Media",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -392,6 +403,22 @@ fun VideoPlayerScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Sleep Timer quick button
+                            IconButton(
+                                onClick = onOpenSleepTimer,
+                                modifier = Modifier.testTag("video_sleep_timer_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = if (sleepSeconds != null) {
+                                        "Sleep Timer: ${formatSleepTimerCountdown(sleepSeconds!!)}"
+                                    } else {
+                                        "Sleep Timer"
+                                    },
+                                    tint = if (sleepSeconds != null) PlayMuseGoldPrimary else Color.White
+                                )
+                            }
+
                             // Aspect Ratio
                             IconButton(onClick = onCycleAspectRatio) {
                                 Icon(
@@ -418,6 +445,18 @@ fun VideoPlayerScreen(
                                     tint = PlayMuseGoldPrimary
                                 )
                             }
+
+                            // Unified Playback Options button
+                            IconButton(
+                                onClick = { showPlaybackOptions = true },
+                                modifier = Modifier.testTag("video_playback_options_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Playback Options",
+                                    tint = PlayMuseGoldPrimary
+                                )
+                            }
                         }
                     }
 
@@ -425,11 +464,11 @@ fun VideoPlayerScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(130.dp)
+                            .height(160.dp)
                             .align(Alignment.BottomCenter)
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f))
                                 )
                             )
                     )
@@ -442,11 +481,31 @@ fun VideoPlayerScreen(
                             .navigationBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        // Time & Scrubber
-                        val posSec = currentPosition / 1000
-                        val durSec = duration / 1000
-                        val posFormatted = String.format("%02d:%02d", (posSec % 3600) / 60, posSec % 60)
-                        val durFormatted = String.format("%02d:%02d", (durSec % 3600) / 60, durSec % 60)
+                        // Active Sleep Timer / A–B Segment Indicators above Scrubber
+                        if (sleepSeconds != null && sleepSeconds!! > 0) {
+                            Text(
+                                text = "Sleep Timer: ${formatSleepTimerCountdown(sleepSeconds!!)}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = PlayMuseGoldPrimary,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier
+                                    .padding(bottom = 2.dp)
+                                    .testTag("video_active_sleep_timer_label")
+                            )
+                        }
+
+                        AbSegmentSeekBarIndicators(
+                            pointAMs = abPointAMs,
+                            pointBMs = abPointBMs,
+                            durationMs = duration,
+                            isLoopActive = isAbLoopActive,
+                            onClearLoop = { playerController.clearAbLoop() }
+                        )
+
+                        // Time & Scrubber using shared hour-aware duration formatter
+                        val posFormatted = formatPlaybackDuration(currentPosition, allowZero = true)
+                        val durFormatted = formatPlaybackDuration(duration, allowZero = true)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -455,7 +514,8 @@ fun VideoPlayerScreen(
                         ) {
                             Text(
                                 text = posFormatted,
-                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White),
+                                modifier = Modifier.testTag("video_position_text")
                             )
 
                             Slider(
@@ -476,7 +536,8 @@ fun VideoPlayerScreen(
 
                             Text(
                                 text = durFormatted,
-                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White)
+                                style = MaterialTheme.typography.labelMedium.copy(color = Color.White),
+                                modifier = Modifier.testTag("video_duration_text")
                             )
                         }
 
@@ -532,11 +593,15 @@ fun VideoPlayerScreen(
                                 )
                             }
 
-                            // Aspect Ratio Mode label
-                            TextButton(onClick = onCycleAspectRatio) {
+                            // Options / A-B Loop quick trigger
+                            TextButton(
+                                onClick = { showPlaybackOptions = true },
+                                modifier = Modifier.testTag("video_options_bottom_button")
+                            ) {
                                 Text(
-                                    text = aspectRatioMode.label,
-                                    color = Color.White,
+                                    text = if (isAbLoopActive) "A–B On" else "Options",
+                                    color = if (isAbLoopActive) PlayMuseGoldPrimary else Color.White,
+                                    fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
                                     maxLines = 1
                                 )
@@ -546,5 +611,30 @@ fun VideoPlayerScreen(
                 }
             }
         }
+    }
+
+    if (showPlaybackOptions) {
+        PlaybackOptionsSheet(
+            isVideoMode = true,
+            playbackSpeed = playbackSpeed,
+            sleepTimerSeconds = sleepSeconds,
+            pointAMs = abPointAMs,
+            pointBMs = abPointBMs,
+            isAbLoopActive = isAbLoopActive,
+            abLoopStatusMessage = abLoopStatusMessage,
+            abLoopErrorMessage = abLoopErrorMessage,
+            isMediaSeekable = isMediaSeekable,
+            onSetPointA = { playerController.setPointA() },
+            onSetPointB = { playerController.setPointB() },
+            onActivateAbLoop = { playerController.activateAbLoop() },
+            onClearAbLoop = { playerController.clearAbLoop() },
+            onOpenSpeed = onOpenSpeed,
+            onOpenSleepTimer = onOpenSleepTimer,
+            onOpenEqualizer = onOpenEqualizer,
+            aspectRatioMode = aspectRatioMode,
+            onCycleAspectRatio = onCycleAspectRatio,
+            onLockControls = { isLocked = true },
+            onDismiss = { showPlaybackOptions = false }
+        )
     }
 }
