@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.videolan.vlc.model.VlcSettings
-import org.videolan.vlc.theme.VlcOrangePrimary
 
 @Composable
 fun SettingsScreen(
@@ -57,7 +56,7 @@ fun SettingsScreen(
                     onClick = onOpenEqualizer
                 )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 SettingsSwitchItem(
                     title = "Background Audio Playback",
@@ -67,7 +66,7 @@ fun SettingsScreen(
                     onCheckedChange = { onSettingsChanged(settings.copy(backgroundPlayback = it)) }
                 )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 SettingsSwitchItem(
                     title = "Audio Boost",
@@ -96,7 +95,7 @@ fun SettingsScreen(
                     onCheckedChange = { onSettingsChanged(settings.copy(hardwareAcceleration = it)) }
                 )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 SettingsSwitchItem(
                     title = "Playback Gestures",
@@ -106,7 +105,7 @@ fun SettingsScreen(
                     onCheckedChange = { onSettingsChanged(settings.copy(gesturesEnabled = it)) }
                 )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 SettingsSwitchItem(
                     title = "Resume Where Left Off",
@@ -163,7 +162,7 @@ private fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelMedium.copy(
-            color = VlcOrangePrimary,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp
         ),
@@ -186,7 +185,7 @@ private fun SettingsClickableItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = VlcOrangePrimary, modifier = Modifier.size(24.dp))
+        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
             Text(text = subtitle, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
@@ -211,7 +210,7 @@ private fun SettingsSwitchItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = VlcOrangePrimary, modifier = Modifier.size(24.dp))
+        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
             Text(text = subtitle, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
@@ -220,8 +219,8 @@ private fun SettingsSwitchItem(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = VlcOrangePrimary
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary
             )
         )
     }

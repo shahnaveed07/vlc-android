@@ -31,7 +31,6 @@ import coil.compose.AsyncImage
 import org.videolan.vlc.R
 import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.MediaType
-import org.videolan.vlc.theme.VlcOrangePrimary
 
 @Composable
 fun VlcMiniPlayer(
@@ -64,8 +63,8 @@ fun VlcMiniPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp),
-                color = VlcOrangePrimary,
-                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
             )
 
             Row(
@@ -98,7 +97,7 @@ fun VlcMiniPlayer(
                             Icon(
                                 imageVector = Icons.Default.MusicNote,
                                 contentDescription = null,
-                                tint = VlcOrangePrimary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(26.dp)
                             )
                         } else {
@@ -144,12 +143,12 @@ fun VlcMiniPlayer(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(RoundedCornerShape(21.dp))
-                            .background(VlcOrangePrimary.copy(alpha = 0.15f))
+                            .background(MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = VlcOrangePrimary,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -161,7 +160,7 @@ fun VlcMiniPlayer(
                         Icon(
                             imageVector = Icons.Default.SkipNext,
                             contentDescription = "Next",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

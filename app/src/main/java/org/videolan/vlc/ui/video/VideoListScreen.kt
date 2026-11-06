@@ -35,8 +35,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.videolan.vlc.R
 import org.videolan.vlc.model.MediaItem
-import org.videolan.vlc.theme.VlcOrangeDark
-import org.videolan.vlc.theme.VlcOrangePrimary
+import org.videolan.vlc.theme.PlayMuseGoldDeep
+import org.videolan.vlc.theme.PlayMuseTextPrimaryDark
 
 @Composable
 fun VideoListScreen(
@@ -67,7 +67,7 @@ fun VideoListScreen(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
-                    text = "Drop media files into your storage or stream from the Streams tab.",
+                    text = "Drop video files into your device storage to start watching.",
                     style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
@@ -166,12 +166,12 @@ fun VideoGridCard(
                         .align(Alignment.TopStart)
                         .padding(6.dp),
                     shape = RoundedCornerShape(4.dp),
-                    color = VlcOrangeDark.copy(alpha = 0.85f)
+                    color = PlayMuseGoldDeep.copy(alpha = 0.9f)
                 ) {
                     Text(
                         text = video.resolution,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = Color.White,
+                            color = PlayMuseTextPrimaryDark,
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp
                         ),
@@ -240,7 +240,7 @@ fun VideoGridCard(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Play as Audio") },
-                            leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null, tint = VlcOrangePrimary) },
+                            leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                             onClick = {
                                 menuExpanded = false
                                 onPlayAsAudio()
@@ -248,7 +248,7 @@ fun VideoGridCard(
                         )
                         DropdownMenuItem(
                             text = { Text("Information") },
-                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = VlcOrangePrimary) },
+                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                             onClick = {
                                 menuExpanded = false
                                 onShowInfo()
@@ -341,12 +341,12 @@ fun VideoListRow(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(3.dp),
-                        color = VlcOrangeDark.copy(alpha = 0.2f)
+                        color = PlayMuseGoldDeep.copy(alpha = 0.2f)
                     ) {
                         Text(
                             text = video.resolution,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = VlcOrangePrimary,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             ),
@@ -380,7 +380,7 @@ fun VideoListRow(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Play as Audio") },
-                        leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null, tint = VlcOrangePrimary) },
+                        leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = {
                             menuExpanded = false
                             onPlayAsAudio()
@@ -388,7 +388,7 @@ fun VideoListRow(
                     )
                     DropdownMenuItem(
                         text = { Text("Information") },
-                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = VlcOrangePrimary) },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = {
                             menuExpanded = false
                             onShowInfo()

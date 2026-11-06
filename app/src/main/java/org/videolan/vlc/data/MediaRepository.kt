@@ -16,7 +16,6 @@ import kotlinx.coroutines.withContext
 import org.videolan.vlc.model.EqualizerPreset
 import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.MediaType
-import org.videolan.vlc.model.StreamBookmark
 import java.io.File
 
 class MediaRepository(private val context: Context) {
@@ -25,7 +24,7 @@ class MediaRepository(private val context: Context) {
     private val sampleVideos = listOf(
         MediaItem(
             id = "sample_video_1",
-            title = "Big Buck Bunny (HLS Stream)",
+            title = "Big Buck Bunny (1080p)",
             artist = "Blender Foundation",
             album = "Open Movie",
             durationMs = 596000L,
@@ -102,7 +101,7 @@ class MediaRepository(private val context: Context) {
         MediaItem(
             id = "sample_audio_2",
             title = "Acoustic Horizon Symphony",
-            artist = "VideoLAN Ensemble",
+            artist = "PLayMuse Acoustic Ensemble",
             album = "Acoustic Journeys",
             durationMs = 188000L,
             uri = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
@@ -137,16 +136,6 @@ class MediaRepository(private val context: Context) {
         )
     )
 
-    // Pre-curated working public internet streams
-    private val curatedStreams = mutableListOf(
-        StreamBookmark("Big Buck Bunny HLS Live", "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "HLS Video"),
-        StreamBookmark("Sintel Animation Trailer", "https://media.w3.org/2010/05/sintel/trailer.mp4", "Direct Video"),
-        StreamBookmark("Big Buck Bunny Trailer", "https://media.w3.org/2010/05/bunny/trailer.mp4", "Direct Video"),
-        StreamBookmark("SomaFM Indie Pop Rocks (Radio)", "https://ice1.somafm.com/indiepop-128-mp3", "Web Radio"),
-        StreamBookmark("SomaFM Groove Salad (Ambient)", "https://ice1.somafm.com/groovesalad-128-mp3", "Web Radio"),
-        StreamBookmark("SomaFM Drone Zone (Atmospheric)", "https://ice4.somafm.com/dronezone-128-mp3", "Web Radio")
-    )
-
     // Equalizer presets
     val equalizerPresets = listOf(
         EqualizerPreset("Flat", listOf(0, 0, 0, 0, 0)),
@@ -177,20 +166,6 @@ class MediaRepository(private val context: Context) {
         } else {
             sampleAudioTracks
         }
-    }
-
-    fun getStreamBookmarks(): List<StreamBookmark> {
-        return curatedStreams.toList()
-    }
-
-    fun addStreamBookmark(bookmark: StreamBookmark) {
-        if (curatedStreams.none { it.url.equals(bookmark.url, ignoreCase = true) }) {
-            curatedStreams.add(0, bookmark)
-        }
-    }
-
-    fun removeStreamBookmark(url: String) {
-        curatedStreams.removeAll { it.url == url }
     }
 
     private fun queryDeviceVideos(): List<MediaItem> {

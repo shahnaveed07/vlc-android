@@ -65,7 +65,6 @@ class PlayMuseIdentityTest {
         val repository = MediaRepository(context)
         val videos = repository.getVideos()
         val audioTracks = repository.getAudioTracks()
-        val streams = repository.getStreamBookmarks()
 
         assertTrue("Sample video catalog must remain populated", videos.isNotEmpty())
         assertTrue("Sample audio catalog must remain populated", audioTracks.isNotEmpty())
@@ -73,7 +72,6 @@ class PlayMuseIdentityTest {
             "PLayMuse Sound Lab artist attribution should be present in sample audio",
             audioTracks.any { it.artist == "PLayMuse Sound Lab" }
         )
-        assertTrue("Default network streams must remain populated", streams.isNotEmpty())
         assertTrue("10-preset graphic equalizer presets must remain intact", repository.equalizerPresets.size >= 10)
     }
 }

@@ -37,8 +37,10 @@ import coil.compose.AsyncImage
 import org.videolan.vlc.R
 import org.videolan.vlc.model.RepeatMode
 import org.videolan.vlc.player.VlcPlayerController
-import org.videolan.vlc.theme.VlcOrangeAccent
-import org.videolan.vlc.theme.VlcOrangePrimary
+import org.videolan.vlc.theme.PlayMuseElevatedSurfaceDark
+import org.videolan.vlc.theme.PlayMuseGoldPrimary
+import org.videolan.vlc.theme.PlayMuseOutlineDark
+import org.videolan.vlc.theme.PlayMuseSurfaceDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,7 +108,7 @@ fun NowPlayingScreen(
                 Text(
                     text = "PLAYMUSE • NOW PLAYING",
                     style = MaterialTheme.typography.labelMedium.copy(
-                        color = VlcOrangePrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         letterSpacing = 1.5.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -116,7 +118,7 @@ fun NowPlayingScreen(
                     Icon(
                         imageVector = Icons.Default.GraphicEq,
                         contentDescription = "Equalizer",
-                        tint = VlcOrangePrimary
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -168,8 +170,8 @@ fun NowPlayingScreen(
                     .size(260.dp)
                     .shadow(16.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(Color(0xFF141422))
-                    .border(4.dp, Color(0xFF282842), CircleShape)
+                    .background(PlayMuseSurfaceDark)
+                    .border(4.dp, PlayMuseOutlineDark, CircleShape)
                     .rotate(if (isPlaying) rotation else 0f),
                 contentAlignment = Alignment.Center
             ) {
@@ -178,13 +180,13 @@ fun NowPlayingScreen(
                     modifier = Modifier
                         .size(220.dp)
                         .clip(CircleShape)
-                        .border(1.dp, Color(0xFF33334F), CircleShape)
+                        .border(1.dp, PlayMuseOutlineDark, CircleShape)
                 )
                 Box(
                     modifier = Modifier
                         .size(180.dp)
                         .clip(CircleShape)
-                        .border(1.dp, Color(0xFF282842), CircleShape)
+                        .border(1.dp, PlayMuseElevatedSurfaceDark, CircleShape)
                 )
 
                 // Center Album Art
@@ -192,7 +194,7 @@ fun NowPlayingScreen(
                     modifier = Modifier
                         .size(130.dp)
                         .clip(CircleShape)
-                        .background(VlcOrangePrimary.copy(alpha = 0.2f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (!currentMedia?.thumbnailUri.isNullOrEmpty()) {
@@ -216,7 +218,7 @@ fun NowPlayingScreen(
                             .size(24.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.background)
-                            .border(2.dp, Color(0xFF4F46E5), CircleShape)
+                            .border(2.dp, PlayMuseGoldPrimary, CircleShape)
                     )
                 }
             }
@@ -251,7 +253,7 @@ fun NowPlayingScreen(
                     Text(
                         text = currentMedia?.album ?: "",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = VlcOrangeAccent,
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 12.sp
                         ),
                         maxLines = 1
@@ -274,9 +276,9 @@ fun NowPlayingScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
-                        thumbColor = VlcOrangePrimary,
-                        activeTrackColor = VlcOrangePrimary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.outline
                     )
                 )
 
@@ -306,7 +308,7 @@ fun NowPlayingScreen(
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (isShuffle) VlcOrangePrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -329,13 +331,13 @@ fun NowPlayingScreen(
                     modifier = Modifier
                         .size(68.dp)
                         .clip(CircleShape)
-                        .background(VlcOrangePrimary)
+                        .background(MaterialTheme.colorScheme.primary)
                         .shadow(8.dp, CircleShape)
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(38.dp)
                     )
                 }
@@ -362,7 +364,7 @@ fun NowPlayingScreen(
                             RepeatMode.ONE -> Icons.Default.RepeatOne
                         },
                         contentDescription = "Repeat: $repeatMode",
-                        tint = if (repeatMode != RepeatMode.OFF) VlcOrangePrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -394,13 +396,13 @@ fun NowPlayingScreen(
                         imageVector = Icons.Default.Timer,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = if (sleepSeconds != null) VlcOrangePrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (sleepSeconds != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (sleepSeconds != null) "${sleepSeconds!! / 60}m" else "Sleep Timer",
                         style = MaterialTheme.typography.labelMedium.copy(
-                            color = if (sleepSeconds != null) VlcOrangePrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (sleepSeconds != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }

@@ -23,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.videolan.vlc.R
-import org.videolan.vlc.theme.PlayMuseIndigoPrimary
-import org.videolan.vlc.theme.PlayMuseVioletAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +81,7 @@ fun VlcTopBar(
                                 text = title,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
-                                    color = PlayMuseVioletAccent
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             )
                         }
@@ -134,7 +132,7 @@ fun VlcTopBar(
                                 DropdownMenuItem(
                                     text = { Text("Equalizer") },
                                     leadingIcon = {
-                                        Icon(Icons.Default.GraphicEq, contentDescription = null, tint = PlayMuseIndigoPrimary)
+                                        Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                     },
                                     onClick = {
                                         menuExpanded = false
@@ -144,7 +142,7 @@ fun VlcTopBar(
                                 DropdownMenuItem(
                                     text = { Text("About PLayMuse") },
                                     leadingIcon = {
-                                        Icon(Icons.Default.Info, contentDescription = null, tint = PlayMuseIndigoPrimary)
+                                        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                     },
                                     onClick = {
                                         menuExpanded = false
@@ -163,7 +161,7 @@ fun VlcTopBar(
                             .testTag("search_input_field"),
                         placeholder = { Text("Search PLayMuse media, artists, titles...") },
                         leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = PlayMuseIndigoPrimary)
+                            Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         },
                         trailingIcon = {
                             IconButton(onClick = {
@@ -175,8 +173,11 @@ fun VlcTopBar(
                         },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PlayMuseIndigoPrimary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            cursorColor = MaterialTheme.colorScheme.primary
                         ),
                         shape = RoundedCornerShape(24.dp)
                     )

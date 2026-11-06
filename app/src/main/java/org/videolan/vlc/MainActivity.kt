@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import org.videolan.vlc.theme.VLCTheme
-import org.videolan.vlc.theme.VlcOrangePrimary
 import org.videolan.vlc.ui.audio.AudioScreen
 import org.videolan.vlc.ui.audio.NowPlayingScreen
 import org.videolan.vlc.ui.browse.BrowseScreen
@@ -38,7 +37,6 @@ import org.videolan.vlc.ui.components.VlcTopBar
 import org.videolan.vlc.ui.equalizer.EqualizerScreen
 import org.videolan.vlc.ui.modals.*
 import org.videolan.vlc.ui.settings.SettingsScreen
-import org.videolan.vlc.ui.stream.StreamScreen
 import org.videolan.vlc.ui.video.VideoListScreen
 import org.videolan.vlc.ui.video.VideoPlayerScreen
 import org.videolan.vlc.viewmodel.ActiveModal
@@ -90,7 +88,6 @@ fun MainAppContent(viewModel: VlcViewModel) {
 
     val videos by viewModel.filteredVideos.collectAsState()
     val audioTracks by viewModel.filteredAudioTracks.collectAsState()
-    val streamBookmarks by viewModel.streamBookmarks.collectAsState()
     val currentBrowsePath by viewModel.currentBrowsePath.collectAsState()
     val browseFiles by viewModel.browseFiles.collectAsState()
     val settings by viewModel.settings.collectAsState()
@@ -147,7 +144,6 @@ fun MainAppContent(viewModel: VlcViewModel) {
                     title = when (currentTab) {
                         VlcTab.VIDEO -> "Videos"
                         VlcTab.AUDIO -> "Audio"
-                        VlcTab.STREAM -> "Streams"
                         VlcTab.BROWSE -> "Browse"
                         VlcTab.MORE -> "More"
                     },
@@ -187,6 +183,14 @@ fun MainAppContent(viewModel: VlcViewModel) {
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         tonalElevation = 4.dp
                     ) {
+                        val navItemColors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
                         NavigationBarItem(
                             selected = currentTab == VlcTab.VIDEO,
                             onClick = { viewModel.setTab(VlcTab.VIDEO) },
@@ -197,10 +201,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
                                 )
                             },
                             label = { Text("Video") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                indicatorColor = VlcOrangePrimary
-                            )
+                            colors = navItemColors
                         )
 
                         NavigationBarItem(
@@ -213,26 +214,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
                                 )
                             },
                             label = { Text("Audio") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                indicatorColor = VlcOrangePrimary
-                            )
-                        )
-
-                        NavigationBarItem(
-                            selected = currentTab == VlcTab.STREAM,
-                            onClick = { viewModel.setTab(VlcTab.STREAM) },
-                            icon = {
-                                Icon(
-                                    imageVector = if (currentTab == VlcTab.STREAM) Icons.Default.Podcasts else Icons.Outlined.Podcasts,
-                                    contentDescription = "Streams"
-                                )
-                            },
-                            label = { Text("Streams") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                indicatorColor = VlcOrangePrimary
-                            )
+                            colors = navItemColors
                         )
 
                         NavigationBarItem(
@@ -245,10 +227,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
                                 )
                             },
                             label = { Text("Browse") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                indicatorColor = VlcOrangePrimary
-                            )
+                            colors = navItemColors
                         )
 
                         NavigationBarItem(
@@ -261,10 +240,7 @@ fun MainAppContent(viewModel: VlcViewModel) {
                                 )
                             },
                             label = { Text("More") },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                indicatorColor = VlcOrangePrimary
-                            )
+                            colors = navItemColors
                         )
                     }
                 }
@@ -297,13 +273,6 @@ fun MainAppContent(viewModel: VlcViewModel) {
                         }
                     },
                     onShowInfo = { viewModel.showModal(ActiveModal.MEDIA_INFO, it) }
-                )
-
-                VlcTab.STREAM -> StreamScreen(
-                    bookmarks = streamBookmarks,
-                    onPlayStream = { url, title -> viewModel.playStream(url, title) },
-                    onAddBookmark = { title, url -> viewModel.addStreamBookmark(title, url) },
-                    onRemoveBookmark = { viewModel.removeStream(it) }
                 )
 
                 VlcTab.BROWSE -> BrowseScreen(

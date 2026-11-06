@@ -29,8 +29,6 @@ import androidx.compose.ui.unit.sp
 import org.videolan.vlc.data.FileItem
 import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.MediaType
-import org.videolan.vlc.theme.VlcOrangeAccent
-import org.videolan.vlc.theme.VlcOrangePrimary
 
 @Composable
 fun BrowseScreen(
@@ -102,7 +100,7 @@ fun BrowseScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowUpward,
                             contentDescription = "Up",
-                            tint = VlcOrangePrimary
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -169,7 +167,7 @@ fun BrowseScreen(
                                 else -> Icons.Default.AudioFile
                             },
                             contentDescription = null,
-                            tint = if (file.isDirectory) VlcOrangePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(28.dp)
                         )
 

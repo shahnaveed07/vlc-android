@@ -22,15 +22,12 @@ import org.videolan.vlc.data.MediaRepository
 import org.videolan.vlc.model.AspectRatioMode
 import org.videolan.vlc.model.EqualizerPreset
 import org.videolan.vlc.model.MediaItem
-import org.videolan.vlc.model.MediaType
-import org.videolan.vlc.model.StreamBookmark
 import org.videolan.vlc.model.VlcSettings
 import org.videolan.vlc.player.VlcPlayerController
 
 enum class VlcTab {
     VIDEO,
     AUDIO,
-    STREAM,
     BROWSE,
     MORE
 }
@@ -41,8 +38,7 @@ enum class ActiveModal {
     SLEEP_TIMER,
     PLAYBACK_SPEED,
     MEDIA_INFO,
-    ABOUT_VLC,
-    ADD_STREAM
+    ABOUT_VLC
 }
 
 class VlcViewModel(application: Application) : AndroidViewModel(application) {
@@ -87,9 +83,6 @@ class VlcViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioTracks = MutableStateFlow<List<MediaItem>>(emptyList())
     val audioTracks: StateFlow<List<MediaItem>> = _audioTracks.asStateFlow()
 
-    private val _streamBookmarks = MutableStateFlow<List<StreamBookmark>>(emptyList())
-    val streamBookmarks: StateFlow<List<StreamBookmark>> = _streamBookmarks.asStateFlow()
-
     // Browsing
     private val _currentBrowsePath = MutableStateFlow<String?>(null)
     val currentBrowsePath: StateFlow<String?> = _currentBrowsePath.asStateFlow()
@@ -124,7 +117,6 @@ class VlcViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadMedia()
-        loadStreams()
         browsePath(null)
     }
 
@@ -133,10 +125,6 @@ class VlcViewModel(application: Application) : AndroidViewModel(application) {
             _videos.value = repository.getVideos()
             _audioTracks.value = repository.getAudioTracks()
         }
-    }
-
-    private fun loadStreams() {
-        _streamBookmarks.value = repository.getStreamBookmarks()
     }
 
     fun setTab(tab: VlcTab) {
@@ -192,35 +180,6 @@ class VlcViewModel(application: Application) : AndroidViewModel(application) {
     fun playAudio(item: MediaItem) {
         playerController.playMedia(item, _audioTracks.value)
         _isNowPlayingExpanded.value = true
-    }
-
-    fun playStream(url: String, title: String = "Network Stream") {
-        if (url.isBlank()) return
-        val streamItem = MediaItem(
-            id = "stream_${System.currentTimeMillis()}",
-            title = title.ifBlank { url },
-            artist = "Network Stream",
-            durationMs = 0L,
-            uri = url.trim(),
-            mediaType = MediaType.STREAM,
-            resolution = "Live Stream"
-        )
-        repository.addStreamBookmark(StreamBookmark(title.ifBlank { url }, url.trim(), "Custom Stream"))
-        loadStreams()
-        playerController.playMedia(streamItem)
-        _isFullScreenVideo.value = true
-    }
-
-    fun addStreamBookmark(title: String, url: String) {
-        if (url.isNotBlank()) {
-            repository.addStreamBookmark(StreamBookmark(title.ifBlank { url }, url.trim(), "Custom Bookmark"))
-            loadStreams()
-        }
-    }
-
-    fun removeStream(url: String) {
-        repository.removeStreamBookmark(url)
-        loadStreams()
     }
 
     fun browsePath(path: String?) {

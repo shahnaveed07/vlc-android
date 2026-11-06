@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.videolan.vlc.model.MediaItem
-import org.videolan.vlc.theme.VlcOrangePrimary
 
 @Composable
 fun AudioScreen(
@@ -48,7 +47,7 @@ fun AudioScreen(
             selectedTabIndex = categories.indexOf(selectedCategory).coerceAtLeast(0),
             edgePadding = 16.dp,
             containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = VlcOrangePrimary,
+            contentColor = MaterialTheme.colorScheme.primary,
             divider = {}
         ) {
             categories.forEach { category ->
@@ -82,7 +81,10 @@ fun AudioScreen(
 
             Button(
                 onClick = onShuffleAll,
-                colors = ButtonDefaults.buttonColors(containerColor = VlcOrangePrimary),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
                 shape = RoundedCornerShape(20.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
             ) {
@@ -90,10 +92,14 @@ fun AudioScreen(
                     imageVector = Icons.Default.Shuffle,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Shuffle", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "Shuffle",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
             }
         }
 
@@ -113,14 +119,14 @@ fun AudioScreen(
                         imageVector = Icons.Default.MusicNote,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
-                        tint = VlcOrangePrimary
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "No audio tracks found",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "Add audio files to your device or listen to sample tracks and online radio streams.",
+                        text = "Add audio files to your device or listen to built-in sample tracks.",
                         style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -184,7 +190,7 @@ fun AudioTrackItem(
                     Icon(
                         imageVector = Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = VlcOrangePrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -226,7 +232,7 @@ fun AudioTrackItem(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Track Details") },
-                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = VlcOrangePrimary) },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = {
                             menuExpanded = false
                             onShowInfo()

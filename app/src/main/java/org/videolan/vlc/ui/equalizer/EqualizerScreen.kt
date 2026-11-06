@@ -24,10 +24,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.BorderStroke
 import org.videolan.vlc.model.EqualizerPreset
 import org.videolan.vlc.player.VlcPlayerController
-import org.videolan.vlc.theme.VlcOrangeAccent
-import org.videolan.vlc.theme.VlcOrangePrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,8 +83,8 @@ fun EqualizerScreen(
                         checked = enabled,
                         onCheckedChange = { playerController.setEqualizerEnabled(it) },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = VlcOrangePrimary
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
                         )
                     )
                     IconButton(onClick = onClose) {
@@ -116,7 +115,7 @@ fun EqualizerScreen(
                             text = selectedPresetName,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = VlcOrangePrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                         )
                     }
@@ -124,10 +123,13 @@ fun EqualizerScreen(
                     Box {
                         Button(
                             onClick = { presetDropdownExpanded = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = VlcOrangePrimary),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Select Preset", color = Color.White)
+                            Text("Select Preset", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                         }
 
                         DropdownMenu(
@@ -179,7 +181,7 @@ fun EqualizerScreen(
                                 Text(
                                     text = "${if (currentVal > 0) "+$currentVal" else "$currentVal"} dB",
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        color = if (currentVal != 0) VlcOrangePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (currentVal != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
@@ -192,8 +194,8 @@ fun EqualizerScreen(
                                 steps = 23,
                                 enabled = enabled,
                                 colors = SliderDefaults.colors(
-                                    thumbColor = VlcOrangePrimary,
-                                    activeTrackColor = VlcOrangePrimary,
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
                                     inactiveTrackColor = MaterialTheme.colorScheme.outline
                                 )
                             )
@@ -226,7 +228,7 @@ fun EqualizerScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Bass Boost", style = MaterialTheme.typography.bodyMedium)
-                            Text("${bassBoost / 10}%", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = VlcOrangePrimary))
+                            Text("${bassBoost / 10}%", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
                         }
                         Slider(
                             value = bassBoost.toFloat(),
@@ -234,8 +236,9 @@ fun EqualizerScreen(
                             valueRange = 0f..1000f,
                             enabled = enabled,
                             colors = SliderDefaults.colors(
-                                thumbColor = VlcOrangePrimary,
-                                activeTrackColor = VlcOrangePrimary
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.outline
                             )
                         )
                     }
@@ -247,7 +250,7 @@ fun EqualizerScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("3D Virtualizer / Surround", style = MaterialTheme.typography.bodyMedium)
-                            Text("${virtualizer / 10}%", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = VlcOrangePrimary))
+                            Text("${virtualizer / 10}%", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
                         }
                         Slider(
                             value = virtualizer.toFloat(),
@@ -255,8 +258,9 @@ fun EqualizerScreen(
                             valueRange = 0f..1000f,
                             enabled = enabled,
                             colors = SliderDefaults.colors(
-                                thumbColor = VlcOrangePrimary,
-                                activeTrackColor = VlcOrangePrimary
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.outline
                             )
                         )
                     }
@@ -272,11 +276,16 @@ fun EqualizerScreen(
                     playerController.setVirtualizer(0)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Icon(Icons.Default.RestartAlt, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Reset to Flat")
+                Text("Reset to Flat", fontWeight = FontWeight.SemiBold)
             }
         }
     }

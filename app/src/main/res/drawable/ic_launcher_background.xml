@@ -14,19 +14,19 @@
                 android:endY="108"
                 android:type="linear">
                 <item
-                    android:color="#1E1B4B"
+                    android:color="#090909"
                     android:offset="0.0" />
                 <item
-                    android:color="#4338CA"
+                    android:color="#121212"
                     android:offset="0.5" />
                 <item
-                    android:color="#6D28D9"
+                    android:color="#1B1B1B"
                     android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Subtle inner studio ring -->
+    <!-- Subtle inner gold studio ring -->
     <path
-        android:fillColor="#18FFFFFF"
+        android:fillColor="#22D4AF37"
         android:pathData="M54,54m-38,0a38,38 0,1 1,76 0a38,38 0,1 1,-76 0" />
 </vector>

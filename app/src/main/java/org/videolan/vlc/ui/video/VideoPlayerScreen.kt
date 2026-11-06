@@ -49,7 +49,8 @@ import kotlinx.coroutines.delay
 import org.videolan.vlc.model.AspectRatioMode
 import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.player.VlcPlayerController
-import org.videolan.vlc.theme.VlcOrangePrimary
+import org.videolan.vlc.theme.PlayMuseBackgroundDark
+import org.videolan.vlc.theme.PlayMuseGoldPrimary
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -223,7 +224,7 @@ fun VideoPlayerScreen(
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = VlcOrangePrimary,
+                            tint = PlayMuseGoldPrimary,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -237,7 +238,7 @@ fun VideoPlayerScreen(
                     hudPercentage?.let { pct ->
                         LinearProgressIndicator(
                             progress = { pct },
-                            color = VlcOrangePrimary,
+                            color = PlayMuseGoldPrimary,
                             trackColor = Color.White.copy(alpha = 0.2f),
                             modifier = Modifier
                                 .width(120.dp)
@@ -304,10 +305,13 @@ fun VideoPlayerScreen(
                         Button(
                             onClick = { playerController.retry() },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = VlcOrangePrimary),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PlayMuseGoldPrimary,
+                                contentColor = PlayMuseBackgroundDark
+                            ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Retry", color = Color.White)
+                            Text("Retry", color = PlayMuseBackgroundDark, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -327,8 +331,8 @@ fun VideoPlayerScreen(
             ) {
                 FloatingActionButton(
                     onClick = { isLocked = false },
-                    containerColor = VlcOrangePrimary,
-                    contentColor = Color.White
+                    containerColor = PlayMuseGoldPrimary,
+                    contentColor = PlayMuseBackgroundDark
                 ) {
                     Icon(Icons.Default.Lock, contentDescription = "Unlock controls")
                 }
@@ -411,7 +415,7 @@ fun VideoPlayerScreen(
                                 Icon(
                                     imageVector = Icons.Default.GraphicEq,
                                     contentDescription = "Equalizer",
-                                    tint = VlcOrangePrimary
+                                    tint = PlayMuseGoldPrimary
                                 )
                             }
                         }
@@ -464,8 +468,8 @@ fun VideoPlayerScreen(
                                     .weight(1f)
                                     .padding(horizontal = 8.dp),
                                 colors = SliderDefaults.colors(
-                                    thumbColor = VlcOrangePrimary,
-                                    activeTrackColor = VlcOrangePrimary,
+                                    thumbColor = PlayMuseGoldPrimary,
+                                    activeTrackColor = PlayMuseGoldPrimary,
                                     inactiveTrackColor = Color.White.copy(alpha = 0.3f)
                                 )
                             )
@@ -502,18 +506,18 @@ fun VideoPlayerScreen(
                                 )
                             }
 
-                            // Play / Pause (Big Orange circle)
+                            // Play / Pause (Gold circle with dark icon)
                             IconButton(
                                 onClick = { playerController.togglePlayPause() },
                                 modifier = Modifier
                                     .size(54.dp)
                                     .clip(CircleShape)
-                                    .background(VlcOrangePrimary)
+                                    .background(PlayMuseGoldPrimary)
                             ) {
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (isPlaying) "Pause" else "Play",
-                                    tint = Color.White,
+                                    tint = PlayMuseBackgroundDark,
                                     modifier = Modifier.size(34.dp)
                                 )
                             }

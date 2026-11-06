@@ -9,8 +9,7 @@ package org.videolan.vlc.model
 
 enum class MediaType {
     VIDEO,
-    AUDIO,
-    STREAM
+    AUDIO
 }
 
 enum class RepeatMode {
@@ -68,13 +67,6 @@ data class MediaItem(
             }
         }
 }
-
-data class StreamBookmark(
-    val title: String,
-    val url: String,
-    val category: String = "Public Stream",
-    val addedTimestamp: Long = System.currentTimeMillis()
-)
 
 data class EqualizerPreset(
     val name: String,

@@ -21,15 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.videolan.vlc.R
 import org.videolan.vlc.model.MediaItem
-import org.videolan.vlc.theme.PlayMuseIndigoPrimary
-import org.videolan.vlc.theme.PlayMuseVioletAccent
-import org.videolan.vlc.theme.VlcOrangePrimary
 
 @Composable
 fun SpeedDialog(
@@ -61,11 +59,11 @@ fun SpeedDialog(
                             text = "${speed}x",
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal,
-                                color = if (speed == currentSpeed) VlcOrangePrimary else MaterialTheme.colorScheme.onSurface
+                                color = if (speed == currentSpeed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                         )
                         if (speed == currentSpeed) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = VlcOrangePrimary)
+                            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -73,7 +71,7 @@ fun SpeedDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = VlcOrangePrimary)
+                Text("Close", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -103,7 +101,7 @@ fun SleepTimerDialog(
                     val minutesLeft = currentRemainingSec / 60
                     Text(
                         text = "Active: stopping in $minutesLeft min",
-                        color = VlcOrangePrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -142,7 +140,7 @@ fun SleepTimerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = VlcOrangePrimary)
+                Text("Close", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -174,9 +172,12 @@ fun MediaInfoDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = VlcOrangePrimary)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
-                Text("OK", color = Color.White)
+                Text("OK", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -213,7 +214,7 @@ fun AboutVlcDialog(onDismiss: () -> Unit) {
                 Text(
                     text = "com.dsc.playmuse • v3.6.0-playmuse",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = PlayMuseVioletAccent,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
                 )
@@ -228,7 +229,7 @@ fun AboutVlcDialog(onDismiss: () -> Unit) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    color = PlayMuseIndigoPrimary.copy(alpha = 0.14f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
@@ -247,12 +248,12 @@ fun AboutVlcDialog(onDismiss: () -> Unit) {
                             text = "Copyright © 2026 DarkSkullCorporation",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.SemiBold,
-                                color = PlayMuseVioletAccent
+                                color = MaterialTheme.colorScheme.primary
                             ),
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "PLayMuse is a cross-format multimedia and music player for Android.",
+                            text = stringResource(id = R.string.about_playmuse_description),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
@@ -261,15 +262,54 @@ fun AboutVlcDialog(onDismiss: () -> Unit) {
                     }
                 }
 
-              
+                // Dedicated Open Source Licenses & Legal Notices Section
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Open Source Licenses & Legal Notices",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = stringResource(id = R.string.upstream_vlc_attribution),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Licensed under the GNU General Public License v2 or later (GPLv2+).",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = PlayMuseIndigoPrimary)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
-                Text("Close", color = Color.White)
+                Text("Close", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         }
     )
