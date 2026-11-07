@@ -1,96 +1,82 @@
-# Task 04 — Complete Audio/Video Playback Controls, Sleep Timer and A–B Segment Loop
+# Task 05 — Simplify About Screen and Implement Real Media Deletion
 
 ## 1. Objective & Scope
 
-Incrementally enhance the audio and video playback controls in **PLayMuse** (`:app`) while preserving the Black & Gold theme, the AndroidX Media3 / ExoPlayer 1.5.1 engine, the removed Streams state, and all existing application functionality:
+Execute two targeted changes in **PLayMuse** (`:app`) while preserving the Black & Gold theme, AndroidX Media3 / ExoPlayer 1.5.1 playback engine, and all existing playback features:
 
-1. **Unified Playback Options Panel:** Provide an accessible Material 3 Playback Options bottom sheet/panel inside both `VideoPlayerScreen` and `NowPlayingScreen`.
-2. **Shared Audio & Video Sleep Timer:** Expose Sleep Timer in both video and audio players, add custom duration (`hours` + `minutes`, 1 min to 24 hours) with input validation, implement a drift-free monotonic countdown updating every second (`MM:SS` / `HH:MM:SS`), and pause playback on expiry.
-3. **A–B Segment Repeat:** Implement A–B segment looping in `VlcPlayerController` using ExoPlayer `PlayerMessage` scheduling at point B (`setDeleteAfterDelivery(false)`), with full segment validation, seek-bar A/B visual markers, manual-seek handling, and automatic reset on media change.
-4. **Playback Duration Formatting Fix:** Introduce a shared hour-aware duration formatter (`00:45`, `59:59`, `1:00:00`, `1:30:00`, `12:05:40`) used across `VideoPlayerScreen`, `NowPlayingScreen`, and `MediaModels`.
-5. **Regression Tests:** Add unit and Robolectric tests covering Sleep Timer presets/custom durations/expiry, A–B segment loop validation/cycling/media transitions, duration formatting, and UI control accessibility.
+1. **Part A — Simplify the About Screen:** Simplify `AboutVlcDialog` to display only the **PLayMuse application logo**, **PLayMuse application name**, and **current application version**, removing visible developer/copyright attribution cards and the misleading `LibVLC Engine` description from the UI while preserving all repository legal files (`COPYING`) and source copyright headers.
+2. **Parts B–G — Real Device Media Deletion:** Add a **Delete** option to Video (grid cards & list rows) and Audio track overflow menus for eligible device-local `MediaStore` items, guarded by a confirmation dialog, API-appropriate Android storage deletion (`MediaStore.createDeleteRequest` on API 30+, `RecoverableSecurityException` handling on API 29, and on-demand `WRITE_EXTERNAL_STORAGE` with `maxSdkVersion="28"` on API 26–28), playback/queue cleanup if the deleted item is currently playing, targeted library refresh, and Snackbar feedback.
 
 ---
 
-## 2. Planned Changes by File
+## 2. Planned Changes
 
-### 2.1 `app/src/main/java/org/videolan/vlc/model/MediaModels.kt`
-- **Duration & Timer Formatting Helpers:**
-  - `formatPlaybackDuration(durationMs: Long, allowZero: Boolean = true): String`:
-    - Formats `< 60` minutes as `MM:SS` (`00:45`, `09:59`, `59:59`).
-    - Formats `>= 60` minutes as `H:MM:SS` / `HH:MM:SS` (`1:00:00`, `1:30:00`, `12:05:40`).
-    - Safely returns `"--:--"` for negative or unknown durations (`durationMs < 0L` or `!allowZero && durationMs == 0L`).
-  - `formatSleepTimerCountdown(totalSeconds: Int): String`:
-    - Formats `< 1` hour as `MM:SS` (`15:42`, `00:09`) so remaining seconds never display as `0m`.
-    - Formats `>= 1` hour as `HH:MM:SS` (`01:05:30`).
-- **Sleep Timer Custom Validation Helper:**
-  - `validateCustomSleepTimerMinutes(hoursText: String, minutesText: String): Int?` (and detailed validation result) enforcing `1..1440` minutes (`1 minute` to `24 hours`) and rejecting zero, negative, malformed, or out-of-range inputs.
+### 2.1 Part A — Simplify About Screen (`VlcModals.kt`, `SettingsScreen.kt`, `strings.xml`)
+- **`AboutVlcDialog` (`app/src/main/java/org/videolan/vlc/ui/modals/VlcModals.kt`):**
+  - Display only:
+    1. PLayMuse application logo (`R.drawable.ic_playmuse_logo`).
+    2. PLayMuse application name (`"PLayMuse"`).
+    3. Current application version (`"Version ${BuildConfig.VERSION_NAME}"` / `"v3.6.0-playmuse"`).
+  - Remove the developer attribution card, copyright card, descriptive paragraph, and Open Source Licenses / LibVLC Engine credit section from the dialog UI.
+- **`SettingsScreen.kt`:**
+  - Simplify the `"About PLayMuse"` row subtitle to `"Application version information"`.
+- **Legal Preservation:**
+  - Preserve `/COPYING`, all file copyright headers, `BuildConfig.UPSTREAM_ATTRIBUTION`, and `R.string.upstream_vlc_attribution` (updating the string value from `"VideoLAN / VLC Authors (LibVLC Engine)"` to `"VideoLAN / VLC Authors"` so it never claims the active Media3 engine is LibVLC while keeping upstream VideoLAN attribution intact).
 
-### 2.2 `app/src/main/java/org/videolan/vlc/player/VlcPlayerController.kt`
-- **Lifecycle-Safe Coroutine Scope:**
-  - Use `CoroutineScope(SupervisorJob() + mainDispatcher)` and cancel the scope inside `release()`.
-- **Monotonic Sleep Timer:**
-  - Validate `minutes in 1..1440` in `setSleepTimer(minutes: Int): Boolean`.
-  - Cancel any existing `sleepTimerJob` before starting a new timer.
-  - Track a monotonic deadline (`elapsedRealtime() + minutes * 60_000L`) and update `_sleepTimerSeconds` every second without drift.
-  - On expiry, set `_sleepTimerSeconds.value = null` and call `exoPlayer.pause()` while preserving the current media item and queue.
-- **A–B Segment Repeat State & `PlayerMessage` Scheduling:**
-  - Expose reactive `StateFlow` properties:
-    - `abPointAMs: StateFlow<Long?>`
-    - `abPointBMs: StateFlow<Long?>`
-    - `isAbPointASelected: StateFlow<Boolean>`
-    - `isAbPointBSelected: StateFlow<Boolean>`
-    - `isAbLoopActive: StateFlow<Boolean>`
-    - `abLoopStatusMessage: StateFlow<String>`
-    - `abLoopErrorMessage: StateFlow<String?>`
-    - `isCurrentMediaSeekable: StateFlow<Boolean>`
-  - Provide controller methods:
-    - `setPointA(positionMs: Long = currentPositionMs()): Boolean`
-    - `setPointB(positionMs: Long = currentPositionMs()): Boolean`
-    - `activateAbLoop(): Boolean`
-    - `clearAbLoop()`
-  - **Validation:**
-    - Require seekable media with a known finite duration (`duration > 0`). Disable and explain when media is live, unseekable, or has unknown duration.
-    - Require `0 <= A < duration` and `A < B <= duration`. Reject `B <= A` with a clear error message without activating an invalid loop.
-  - **Loop Execution:**
-    - Schedule an ExoPlayer `PlayerMessage` at position `B` on the current media item index with `setDeleteAfterDelivery(false)`.
-    - When `B` is reached (or if `B` is at the end of media and `STATE_ENDED` triggers), seek immediately to `A`, continue playback if playing, or preserve pause state if paused.
-    - Handle manual seeking (`seekTo` / `seekRelative`) predictably so the loop stays active and synchronized.
-    - Automatically clear A–B markers when switching to a different media item (`playMedia`), while preserving A–B markers across `retry()` of the same media item.
+### 2.2 Part B & C — Video & Audio Overflow Menu Delete Action (`VideoListScreen.kt`, `AudioScreen.kt`)
+- **Local Media Eligibility (`isDeletableLocalMedia(item: MediaItem)`):**
+  - Validate that `item.uri` parses as a `content://` URI with authority `MediaStore.AUTHORITY` (`"media"`), a valid `video/media` or `audio/media` path matching `item.mediaType`, and a positive numeric item ID (`ContentUris.parseId(uri) > 0`).
+  - Remote sample items (`https://...`) and non-MediaStore URIs return `false` and do **not** show the Delete option.
+- **`VideoListScreen.kt` (`VideoGridCard` & `VideoListRow`):**
+  - Add `onDeleteVideo: (MediaItem) -> Unit` callback.
+  - In the 3-dot `DropdownMenu`, show `Play as Audio`, `Information`, and (when `isDeletableLocalMedia(video)` is `true`) `Delete` with `Icons.Default.Delete` tinted with `MaterialTheme.colorScheme.error`.
+- **`AudioScreen.kt` (`AudioTrackItem`):**
+  - Add `onDeleteTrack: (MediaItem) -> Unit` callback.
+  - In the 3-dot `DropdownMenu`, show `Track Details` and (when `isDeletableLocalMedia(track)` is `true`) `Delete` with `Icons.Default.Delete` tinted with `MaterialTheme.colorScheme.error`.
 
-### 2.3 `app/src/main/java/org/videolan/vlc/ui/modals/VlcModals.kt`
-- **Enhanced `SleepTimerDialog`:**
-  - Keep existing presets (`15 minutes`, `30 minutes`, `45 minutes`, `1 hour`, `1.5 hours`).
-  - Add custom `Hours` and `Minutes` inputs (`1 min` – `24 hours`) with inline error feedback for invalid values.
-  - Show live formatted countdown (`15:42` / `01:05:30`), state clearly that playback will pause when the timer expires, and provide `Cancel Active Timer`.
-- **Unified `PlaybackOptionsSheet` (and `AbRepeatControlsCard`):**
-  - Provide a compact Material 3 bottom sheet styled in the Black & Gold theme:
-    - **Video Mode:** Playback speed, Sleep Timer (with live countdown), A–B segment repeat (`Set A`, `Set B`, `Activate Loop`, `Clear Loop`, status & timestamps), Aspect ratio, Equalizer, and Lock controls.
-    - **Audio Mode:** Playback speed, Sleep Timer (with live countdown), A–B segment repeat (`Set A`, `Set B`, `Activate Loop`, `Clear Loop`, status & timestamps), Shuffle, Repeat (`Off` / `All` / `One`), Equalizer, and Queue transport controls.
+### 2.3 Part D — Confirmation Dialog & Android API 26–36 Deletion (`VlcModals.kt`, `MediaRepository.kt`, `AndroidManifest.xml`)
+- **`DeleteMediaConfirmationDialog` (`VlcModals.kt`):**
+  - **Video:** Title `"Delete Video?"`, Message `"Are you sure you want to permanently delete \"[Video Title]\" from your device?"`
+  - **Audio:** Title `"Delete Audio?"`, Message `"Are you sure you want to permanently delete \"[Track Title]\" from your device?"`
+  - Buttons: `Cancel` and `Delete` (using `MaterialTheme.colorScheme.error`).
+- **`AndroidManifest.xml`:**
+  - Add `<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />` for Android 8.0–9 (API 26–28) legacy deletion support. Never request `MANAGE_EXTERNAL_STORAGE` and never request write permission at startup.
+- **`MediaRepository.kt` (`MediaDeleteResult` & Deletion Execution):**
+  - Define typed `MediaDeleteResult`:
+    - `Deleted(mediaItem)`
+    - `RequiresSystemConsent(mediaItem, intentSender, requiresFollowUpDelete)`
+    - `RequiresLegacyWritePermission(mediaItem)`
+    - `Cancelled(mediaItem)`
+    - `PermissionDenied(mediaItem, message)`
+    - `NotFoundOrIneligible(mediaItem, message)`
+    - `Error(mediaItem, message)`
+  - **API 30+ (Android 11+):** Use `MediaStore.createDeleteRequest(contentResolver, listOf(uri))` and return `RequiresSystemConsent(..., requiresFollowUpDelete = false)`. When approved (`RESULT_OK`), treat deletion as complete without calling `ContentResolver.delete()` a second time.
+  - **API 29 (Android 10):** Call `contentResolver.delete(uri, null, null)`. Catch `RecoverableSecurityException` and return `RequiresSystemConsent(mediaItem, e.userAction.actionIntent.intentSender, requiresFollowUpDelete = true)` so upon user approval, `contentResolver.delete(uri, null, null)` completes the deletion.
+  - **API 26–28 (Android 8–9):** Check `WRITE_EXTERNAL_STORAGE`; if not granted, return `RequiresLegacyWritePermission(mediaItem)` so `MainActivity` requests it on demand; once granted, execute `contentResolver.delete(uri, null, null)`.
 
-### 2.4 `app/src/main/java/org/videolan/vlc/ui/video/VideoPlayerScreen.kt` & `MainActivity.kt`
-- Pass `onOpenSleepTimer = { viewModel.showModal(ActiveModal.SLEEP_TIMER) }` from `MainActivity.kt` into `VideoPlayerScreen`.
-- Add Sleep Timer, A–B Repeat quick controls/status pill, and **Playback Options** button to `VideoPlayerScreen`.
-- Render `A` and `B` visual markers along the video seek bar when set.
-- Replace inline `%02d:%02d` modulo formatting with `formatPlaybackDuration(...)`.
+### 2.4 Part E, F & G — ViewModel Coordination, Playback/Queue Safety & Library Refresh (`VlcViewModel.kt`, `VlcPlayerController.kt`, `MainActivity.kt`)
+- **Playback & Queue Safety (`VlcPlayerController.onMediaItemDeleted(item)`):**
+  - If the deleted item matches `currentMedia` (by `id` or `uri`), safely stop `exoPlayer`, clear `currentMedia`, reset position/duration/A–B loop state, and close full-screen/expanded player overlays so no stale mini-player or active player points to a deleted file.
+  - Remove only the deleted item from `_playlist`, leaving all other queue items untouched.
+- **Targeted Library Refresh (`VlcViewModel`):**
+  - Refresh only `_videos` when a video is deleted (`loadVideos()`), and only `_audioTracks` when an audio track is deleted (`loadAudioTracks()`).
+  - Guard against duplicate concurrent delete requests (`isDeleteInProgress`).
+  - Emit Snackbar messages for confirmed deletion or failure, and perform no removal or message on user cancellation.
 
-### 2.5 `app/src/main/java/org/videolan/vlc/ui/audio/NowPlayingScreen.kt`
-- Add A–B Repeat status/controls and **Playback Options** button to `NowPlayingScreen`.
-- Render `A` and `B` visual markers along the audio seek bar when set.
-- Display accurate Sleep Timer countdown (`formatSleepTimerCountdown(...)`) instead of `${sleepSeconds / 60}m`.
-- Replace inline `%02d:%02d` modulo formatting with `formatPlaybackDuration(...)`.
-
-### 2.6 Regression Tests (`app/src/test/java/org/videolan/vlc/PlaybackControlsAndLoopTest.kt`)
-- **Duration & Timer Formatting Tests:** Short (`00:45`), `09:59`, `59:59`, `1:00:00`, `1:30:00`, `12:05:40`, and sleep timer countdown (`15:42`, `01:05:30`, `< 60s` never showing `0m`).
-- **Sleep Timer Tests:** All presets (`15`, `30`, `45`, `60`, `90`), custom duration validation (`1m`..`24h`, rejecting `0`, negative, malformed, `> 24h`), replacing active timer, cancelling timer, expiry pausing playback and resetting timer state, single active timer job, and shared state across audio and video.
-- **A–B Segment Loop Tests:** Set A, Set B, reject `B < A`, reject `B == A`, activate valid loop, loop jump from `B` to `A` across repeated cycles, clear loop, clear markers on media change, preserve markers on retry, independence from track `RepeatMode`, rejection on unseekable/unknown-duration media, manual seek behaviour, and pause/resume preservation.
-- **UI Verification Tests:** Verify Playback Options, Sleep Timer, and A–B Loop controls and status indicators are accessible in both `VideoPlayerScreen` and `NowPlayingScreen`.
+### 2.5 Part H — Regression Tests (`app/src/test/java/org/videolan/vlc/AboutAndMediaDeleteTest.kt`)
+- **About Screen Tests:** Verify `AboutVlcDialog` renders the PLayMuse logo, `"PLayMuse"` name, and version, while confirming developer/copyright cards and `"LibVLC Engine"` text are absent from the UI and `/COPYING` + source headers remain intact.
+- **Media Delete Eligibility & Workflow Tests:**
+  - Verify local `content://media/external/video/media/{id}` and `content://media/external/audio/media/{id}` URIs are eligible.
+  - Verify `https://` sample videos/audio and third-party authorities (`content://com.example.provider/...`) are rejected.
+  - Verify confirmation cancellation performs no deletion.
+  - Verify successful deletion removes the MediaStore entry, refreshes only the relevant library (video vs. audio), and leaves the other library untouched.
+  - Verify permission denial and system consent cancellation keep the item in the library and do not report success.
+  - Verify deleting the currently playing item clears active playback and removes only that item from the queue without disturbing other queue items.
 
 ---
 
 ## 3. Verification Plan
 
-1. Run unit and Robolectric tests: `gradle :app:testDebugUnitTest --rerun-tasks`.
+1. Run all unit & Robolectric tests: `gradle :app:testDebugUnitTest --rerun-tasks`.
 2. Run Android Lint: `lint_applet` (`:app:lintDebug`).
 3. Build debug APK: `compile_applet` (`:app:assembleDebug`).
-4. Verify Black & Gold theme integrity, Streams removal preservation, and Media3 engine preservation.

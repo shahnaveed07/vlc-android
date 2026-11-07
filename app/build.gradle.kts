@@ -30,7 +30,7 @@ android {
         buildConfigField("String", "APP_ID", "\"com.dsc.playmuse\"")
         buildConfigField("String", "COPYRIGHT_HOLDER", "\"DarkSkullCorporation\"")
         buildConfigField("String", "DEVELOPER_NAME", "\"Naveed Mushtaq\"")
-        buildConfigField("String", "UPSTREAM_ATTRIBUTION", "\"VideoLAN / VLC Authors (LibVLC Engine)\"")
+        buildConfigField("String", "UPSTREAM_ATTRIBUTION", "\"VideoLAN / VLC Authors\"")
     }
 
     signingConfigs {

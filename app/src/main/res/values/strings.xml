@@ -14,5 +14,5 @@
     <string name="copyright_notice">Copyright © 2026 DarkSkullCorporation</string>
     <string name="about_playmuse_title">About PLayMuse</string>
     <string name="about_playmuse_description">PLayMuse is a modern cross-format multimedia and music player for Android developed by Naveed Mushtaq under DarkSkullCorporation.</string>
-    <string name="upstream_vlc_attribution">VideoLAN / VLC Authors (LibVLC Engine)</string>
+    <string name="upstream_vlc_attribution">VideoLAN / VLC Authors</string>
 </resources>

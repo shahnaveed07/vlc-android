@@ -8,6 +8,7 @@
 package org.videolan.vlc.viewmodel
 
 import android.app.Application
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +22,11 @@ import org.videolan.vlc.data.FileItem
 import org.videolan.vlc.data.MediaRepository
 import org.videolan.vlc.model.AspectRatioMode
 import org.videolan.vlc.model.EqualizerPreset
+import org.videolan.vlc.model.MediaDeleteResult
 import org.videolan.vlc.model.MediaItem
+import org.videolan.vlc.model.MediaType
 import org.videolan.vlc.model.VlcSettings
+import org.videolan.vlc.model.isEligibleLocalMediaStoreItem
 import org.videolan.vlc.player.VlcPlayerController
 
 enum class VlcTab {
@@ -43,7 +47,8 @@ enum class ActiveModal {
 
 class VlcViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = MediaRepository(application)
+    var repository = MediaRepository(application)
+        internal set
     val playerController = VlcPlayerController(application)
 
     // Navigation & Screen States
@@ -61,6 +66,22 @@ class VlcViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedMediaForInfo = MutableStateFlow<MediaItem?>(null)
     val selectedMediaForInfo: StateFlow<MediaItem?> = _selectedMediaForInfo.asStateFlow()
+
+    // Media deletion states
+    private val _pendingDeleteMedia = MutableStateFlow<MediaItem?>(null)
+    val pendingDeleteMedia: StateFlow<MediaItem?> = _pendingDeleteMedia.asStateFlow()
+
+    private val _isDeleteInProgress = MutableStateFlow(false)
+    val isDeleteInProgress: StateFlow<Boolean> = _isDeleteInProgress.asStateFlow()
+
+    private val _pendingConsentEvent = MutableStateFlow<MediaDeleteResult.RequiresSystemConsent?>(null)
+    val pendingConsentEvent: StateFlow<MediaDeleteResult.RequiresSystemConsent?> = _pendingConsentEvent.asStateFlow()
+
+    private val _pendingLegacyPermissionItem = MutableStateFlow<MediaItem?>(null)
+    val pendingLegacyPermissionItem: StateFlow<MediaItem?> = _pendingLegacyPermissionItem.asStateFlow()
+
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
     // Search and display
     private val _searchQuery = MutableStateFlow("")
@@ -125,6 +146,157 @@ class VlcViewModel(application: Application) : AndroidViewModel(application) {
             _videos.value = repository.getVideos()
             _audioTracks.value = repository.getAudioTracks()
         }
+    }
+
+    fun loadVideos() {
+        viewModelScope.launch {
+            _videos.value = repository.getVideos()
+        }
+    }
+
+    fun loadAudioTracks() {
+        viewModelScope.launch {
+            _audioTracks.value = repository.getAudioTracks()
+        }
+    }
+
+    fun requestDeleteMedia(item: MediaItem) {
+        if (_isDeleteInProgress.value) return
+        if (!isEligibleLocalMediaStoreItem(item)) {
+            _snackbarMessage.value = "Only local device media files can be deleted."
+            return
+        }
+        _pendingDeleteMedia.value = item
+    }
+
+    fun cancelDeleteMedia() {
+        _pendingDeleteMedia.value = null
+    }
+
+    fun confirmDeleteMedia(
+        sdkInt: Int = Build.VERSION.SDK_INT,
+        hasLegacyWritePermission: Boolean = repository.hasLegacyWriteStoragePermission()
+    ) {
+        val item = _pendingDeleteMedia.value ?: return
+        if (_isDeleteInProgress.value) return
+        _pendingDeleteMedia.value = null
+        _isDeleteInProgress.value = true
+
+        viewModelScope.launch {
+            val result = repository.deleteMediaItem(
+                item = item,
+                sdkInt = sdkInt,
+                hasLegacyWritePermission = hasLegacyWritePermission
+            )
+            handleMediaDeleteResult(result)
+        }
+    }
+
+    fun onSystemDeleteConsentResult(granted: Boolean) {
+        val consent = _pendingConsentEvent.value ?: return
+        _pendingConsentEvent.value = null
+
+        if (!granted) {
+            _isDeleteInProgress.value = false
+            _snackbarMessage.value = "Deletion cancelled."
+            return
+        }
+
+        viewModelScope.launch {
+            val result = repository.completePostConsentDelete(
+                item = consent.mediaItem,
+                requiresFollowUpDelete = consent.requiresFollowUpDelete
+            )
+            handleMediaDeleteResult(result)
+        }
+    }
+
+    fun onLegacyWritePermissionResult(
+        granted: Boolean,
+        sdkInt: Int = Build.VERSION.SDK_INT
+    ) {
+        val item = _pendingLegacyPermissionItem.value ?: return
+        _pendingLegacyPermissionItem.value = null
+
+        if (!granted) {
+            _isDeleteInProgress.value = false
+            _snackbarMessage.value = "Storage permission is required to delete media files."
+            return
+        }
+
+        viewModelScope.launch {
+            val result = repository.deleteMediaItem(
+                item = item,
+                sdkInt = sdkInt,
+                hasLegacyWritePermission = true
+            )
+            handleMediaDeleteResult(result)
+        }
+    }
+
+    private suspend fun handleMediaDeleteResult(result: MediaDeleteResult) {
+        when (result) {
+            is MediaDeleteResult.Deleted -> {
+                val deletedItem = result.mediaItem
+                val wasPlayingDeleted = playerController.onMediaItemDeleted(deletedItem)
+                if (wasPlayingDeleted) {
+                    _isFullScreenVideo.value = false
+                    _isNowPlayingExpanded.value = false
+                }
+                if (_selectedMediaForInfo.value?.id == deletedItem.id ||
+                    _selectedMediaForInfo.value?.uri == deletedItem.uri
+                ) {
+                    closeModal()
+                }
+
+                // Targeted library refresh: only refresh the affected library
+                val matchesDeleted: (MediaItem) -> Boolean = { candidate ->
+                    candidate.id == deletedItem.id || candidate.uri == deletedItem.uri
+                }
+                if (deletedItem.mediaType == MediaType.VIDEO) {
+                    _videos.value = _videos.value.filterNot(matchesDeleted)
+                    _videos.value = repository.getVideos().filterNot(matchesDeleted)
+                } else {
+                    _audioTracks.value = _audioTracks.value.filterNot(matchesDeleted)
+                    _audioTracks.value = repository.getAudioTracks().filterNot(matchesDeleted)
+                }
+
+                _isDeleteInProgress.value = false
+                _snackbarMessage.value = "Deleted \"${deletedItem.title}\""
+            }
+
+            is MediaDeleteResult.RequiresSystemConsent -> {
+                _pendingConsentEvent.value = result
+            }
+
+            is MediaDeleteResult.RequiresLegacyWritePermission -> {
+                _pendingLegacyPermissionItem.value = result.mediaItem
+            }
+
+            is MediaDeleteResult.Cancelled -> {
+                _isDeleteInProgress.value = false
+                _snackbarMessage.value = "Deletion cancelled."
+            }
+
+            is MediaDeleteResult.PermissionDenied -> {
+                _isDeleteInProgress.value = false
+                _snackbarMessage.value = result.message
+            }
+
+            is MediaDeleteResult.NotFoundOrIneligible -> {
+                _isDeleteInProgress.value = false
+                _snackbarMessage.value = result.message
+            }
+
+            is MediaDeleteResult.Error -> {
+                _isDeleteInProgress.value = false
+                _snackbarMessage.value = result.message
+            }
+        }
+    }
+
+    fun clearSnackbarMessage() {
+        _snackbarMessage.value = null
     }
 
     fun setTab(tab: VlcTab) {

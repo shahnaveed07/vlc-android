@@ -7,18 +7,42 @@
  */
 package org.videolan.vlc.data
 
+import android.Manifest
+import android.app.RecoverableSecurityException
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.content.IntentSender
+import android.content.pm.PackageManager
 import android.database.Cursor
+import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.videolan.vlc.model.EqualizerPreset
+import org.videolan.vlc.model.MediaDeleteResult
 import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.MediaType
+import org.videolan.vlc.model.parseValidMediaStoreUri
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
-class MediaRepository(private val context: Context) {
+class MediaRepository(
+    private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val systemDeleteIntentCreator: (ContentResolver, List<Uri>) -> IntentSender = { resolver, uris ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            MediaStore.createDeleteRequest(resolver, uris).intentSender
+        } else {
+            throw UnsupportedOperationException("MediaStore.createDeleteRequest requires API 30+")
+        }
+    }
+) {
+
+    private val deletedMediaUris: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // Default built-in sample videos (High quality open source media for immediate playback)
     private val sampleVideos = listOf(
@@ -150,7 +174,7 @@ class MediaRepository(private val context: Context) {
         EqualizerPreset("Techno", listOf(5, 3, 0, 3, 5))
     )
 
-    suspend fun getVideos(): List<MediaItem> = withContext(Dispatchers.IO) {
+    suspend fun getVideos(): List<MediaItem> = withContext(ioDispatcher) {
         val deviceVideos = queryDeviceVideos()
         if (deviceVideos.isNotEmpty()) {
             deviceVideos + sampleVideos
@@ -159,12 +183,184 @@ class MediaRepository(private val context: Context) {
         }
     }
 
-    suspend fun getAudioTracks(): List<MediaItem> = withContext(Dispatchers.IO) {
+    suspend fun getAudioTracks(): List<MediaItem> = withContext(ioDispatcher) {
         val deviceAudio = queryDeviceAudio()
         if (deviceAudio.isNotEmpty()) {
             deviceAudio + sampleAudioTracks
         } else {
             sampleAudioTracks
+        }
+    }
+
+    fun hasLegacyWriteStoragePermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Permanently deletes a local device MediaStore video or audio file using the appropriate
+     * Android API level storage flow:
+     * - API 30+ (Android 11+): Requests user confirmation via MediaStore.createDeleteRequest().
+     * - API 29 (Android 10): Calls ContentResolver.delete() and handles RecoverableSecurityException.
+     * - API 26–28 (Android 8–9): Checks WRITE_EXTERNAL_STORAGE and calls ContentResolver.delete().
+     */
+    suspend fun deleteMediaItem(
+        item: MediaItem,
+        sdkInt: Int = Build.VERSION.SDK_INT,
+        hasLegacyWritePermission: Boolean = hasLegacyWriteStoragePermission()
+    ): MediaDeleteResult = withContext(ioDispatcher) {
+        val uri = parseValidMediaStoreUri(item.uri, item.mediaType)
+            ?: return@withContext MediaDeleteResult.NotFoundOrIneligible(
+                item,
+                "Only local device media files can be deleted."
+            )
+
+        when {
+            sdkInt >= Build.VERSION_CODES.R -> {
+                try {
+                    val intentSender = systemDeleteIntentCreator(context.contentResolver, listOf(uri))
+                    MediaDeleteResult.RequiresSystemConsent(
+                        mediaItem = item,
+                        intentSender = intentSender,
+                        requiresFollowUpDelete = false
+                    )
+                } catch (e: SecurityException) {
+                    MediaDeleteResult.PermissionDenied(
+                        item,
+                        "Permission denied while requesting media deletion."
+                    )
+                } catch (e: IllegalArgumentException) {
+                    MediaDeleteResult.NotFoundOrIneligible(
+                        item,
+                        "Media file could not be found on your device."
+                    )
+                } catch (e: Exception) {
+                    MediaDeleteResult.Error(
+                        item,
+                        e.localizedMessage ?: "Failed to initiate media deletion."
+                    )
+                }
+            }
+
+            sdkInt == Build.VERSION_CODES.Q -> {
+                try {
+                    val deletedRows = context.contentResolver.delete(uri, null, null)
+                    if (deletedRows > 0) {
+                        deletedMediaUris.add(uri.toString())
+                        MediaDeleteResult.Deleted(item)
+                    } else {
+                        MediaDeleteResult.NotFoundOrIneligible(
+                            item,
+                            "Media file was not found or already deleted."
+                        )
+                    }
+                } catch (e: SecurityException) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
+                        MediaDeleteResult.RequiresSystemConsent(
+                            mediaItem = item,
+                            intentSender = e.userAction.actionIntent.intentSender,
+                            requiresFollowUpDelete = true
+                        )
+                    } else {
+                        MediaDeleteResult.PermissionDenied(
+                            item,
+                            "Permission denied to delete this media file."
+                        )
+                    }
+                } catch (e: IllegalArgumentException) {
+                    MediaDeleteResult.NotFoundOrIneligible(
+                        item,
+                        "Media file could not be found on your device."
+                    )
+                } catch (e: Exception) {
+                    MediaDeleteResult.Error(
+                        item,
+                        e.localizedMessage ?: "Failed to delete media file."
+                    )
+                }
+            }
+
+            else -> {
+                if (!hasLegacyWritePermission) {
+                    return@withContext MediaDeleteResult.RequiresLegacyWritePermission(item)
+                }
+                try {
+                    val deletedRows = context.contentResolver.delete(uri, null, null)
+                    if (deletedRows > 0) {
+                        deletedMediaUris.add(uri.toString())
+                        MediaDeleteResult.Deleted(item)
+                    } else {
+                        MediaDeleteResult.NotFoundOrIneligible(
+                            item,
+                            "Media file was not found or already deleted."
+                        )
+                    }
+                } catch (e: SecurityException) {
+                    MediaDeleteResult.PermissionDenied(
+                        item,
+                        "Storage permission is required to delete media files."
+                    )
+                } catch (e: IllegalArgumentException) {
+                    MediaDeleteResult.NotFoundOrIneligible(
+                        item,
+                        "Media file could not be found on your device."
+                    )
+                } catch (e: Exception) {
+                    MediaDeleteResult.Error(
+                        item,
+                        e.localizedMessage ?: "Failed to delete media file."
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Completes a pending deletion after the user approves the system consent dialog.
+     * - On Android 11+ (API 30+), `MediaStore.createDeleteRequest` already deleted the file when
+     *   `RESULT_OK` was returned (`requiresFollowUpDelete == false`), so no second `ContentResolver.delete`
+     *   call is issued.
+     * - On Android 10 (API 29), after `RecoverableSecurityException` approval (`requiresFollowUpDelete == true`),
+     *   `ContentResolver.delete` is invoked once to complete the deletion.
+     */
+    suspend fun completePostConsentDelete(
+        item: MediaItem,
+        requiresFollowUpDelete: Boolean
+    ): MediaDeleteResult = withContext(ioDispatcher) {
+        val uri = parseValidMediaStoreUri(item.uri, item.mediaType)
+            ?: return@withContext MediaDeleteResult.NotFoundOrIneligible(
+                item,
+                "Only local device media files can be deleted."
+            )
+
+        if (!requiresFollowUpDelete) {
+            deletedMediaUris.add(uri.toString())
+            return@withContext MediaDeleteResult.Deleted(item)
+        }
+
+        try {
+            val deletedRows = context.contentResolver.delete(uri, null, null)
+            if (deletedRows > 0) {
+                deletedMediaUris.add(uri.toString())
+                MediaDeleteResult.Deleted(item)
+            } else {
+                MediaDeleteResult.NotFoundOrIneligible(
+                    item,
+                    "Media file was not found or already deleted."
+                )
+            }
+        } catch (e: SecurityException) {
+            MediaDeleteResult.PermissionDenied(
+                item,
+                "Permission denied to delete this media file."
+            )
+        } catch (e: Exception) {
+            MediaDeleteResult.Error(
+                item,
+                e.localizedMessage ?: "Failed to complete media deletion."
+            )
         }
     }
 
@@ -202,6 +398,7 @@ class MediaRepository(private val context: Context) {
                     val size = it.getLong(sizeCol)
                     val res = if (resCol != -1) it.getString(resCol) ?: "HD" else "HD"
                     val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                    if (contentUri.toString() in deletedMediaUris) continue
 
                     list.add(
                         MediaItem(
@@ -257,6 +454,7 @@ class MediaRepository(private val context: Context) {
                     val duration = it.getLong(durationCol)
                     val size = it.getLong(sizeCol)
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                    if (contentUri.toString() in deletedMediaUris) continue
 
                     list.add(
                         MediaItem(
@@ -279,7 +477,7 @@ class MediaRepository(private val context: Context) {
         return list
     }
 
-    suspend fun browseDirectory(path: String?): List<FileItem> = withContext(Dispatchers.IO) {
+    suspend fun browseDirectory(path: String?): List<FileItem> = withContext(ioDispatcher) {
         val targetDir = if (path.isNullOrEmpty()) {
             context.getExternalFilesDir(null)?.parentFile ?: File("/sdcard")
         } else {

@@ -8,6 +8,7 @@
 package org.videolan.vlc
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -15,6 +16,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
@@ -75,6 +77,11 @@ fun MainAppContent(viewModel: VlcViewModel) {
     val activeModal by viewModel.activeModal.collectAsState()
     val selectedMediaForInfo by viewModel.selectedMediaForInfo.collectAsState()
 
+    val pendingDeleteMedia by viewModel.pendingDeleteMedia.collectAsState()
+    val pendingConsentEvent by viewModel.pendingConsentEvent.collectAsState()
+    val pendingLegacyPermissionItem by viewModel.pendingLegacyPermissionItem.collectAsState()
+    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+
     val currentPlayingMedia by viewModel.playerController.currentMedia.collectAsState()
     val isPlaying by viewModel.playerController.isPlaying.collectAsState()
     val currentPosition by viewModel.playerController.currentPosition.collectAsState()
@@ -109,7 +116,49 @@ fun MainAppContent(viewModel: VlcViewModel) {
         }
     }
 
-    // Request permissions for local media
+    LaunchedEffect(snackbarMessage) {
+        val message = snackbarMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            message = message,
+            duration = SnackbarDuration.Short
+        )
+        viewModel.clearSnackbarMessage()
+    }
+
+    // System MediaStore deletion consent launcher (Android 10 RecoverableSecurityException / Android 11+ createDeleteRequest)
+    val deleteConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { activityResult ->
+        viewModel.onSystemDeleteConsentResult(activityResult.resultCode == Activity.RESULT_OK)
+    }
+
+    LaunchedEffect(pendingConsentEvent) {
+        val consent = pendingConsentEvent ?: return@LaunchedEffect
+        try {
+            val request = IntentSenderRequest.Builder(consent.intentSender).build()
+            deleteConsentLauncher.launch(request)
+        } catch (e: Exception) {
+            viewModel.onSystemDeleteConsentResult(false)
+        }
+    }
+
+    // Legacy WRITE_EXTERNAL_STORAGE runtime permission launcher (used only on Android 8–9 / API 26–28 when deleting)
+    val legacyWritePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.onLegacyWritePermissionResult(granted)
+    }
+
+    LaunchedEffect(pendingLegacyPermissionItem) {
+        val item = pendingLegacyPermissionItem ?: return@LaunchedEffect
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            legacyWritePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            viewModel.onLegacyWritePermissionResult(true)
+        }
+    }
+
+    // Request permissions for reading local media
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -258,7 +307,8 @@ fun MainAppContent(viewModel: VlcViewModel) {
                     isGridMode = isGridMode,
                     onVideoClick = { viewModel.playVideo(it) },
                     onPlayAsAudio = { viewModel.playAudio(it) },
-                    onShowInfo = { viewModel.showModal(ActiveModal.MEDIA_INFO, it) }
+                    onShowInfo = { viewModel.showModal(ActiveModal.MEDIA_INFO, it) },
+                    onDeleteVideo = { viewModel.requestDeleteMedia(it) }
                 )
 
                 VlcTab.AUDIO -> AudioScreen(
@@ -272,7 +322,8 @@ fun MainAppContent(viewModel: VlcViewModel) {
                             viewModel.setNowPlayingExpanded(true)
                         }
                     },
-                    onShowInfo = { viewModel.showModal(ActiveModal.MEDIA_INFO, it) }
+                    onShowInfo = { viewModel.showModal(ActiveModal.MEDIA_INFO, it) },
+                    onDeleteTrack = { viewModel.requestDeleteMedia(it) }
                 )
 
                 VlcTab.BROWSE -> BrowseScreen(
@@ -298,6 +349,15 @@ fun MainAppContent(viewModel: VlcViewModel) {
                 )
             }
         }
+    }
+
+    // Delete Confirmation Dialog
+    if (pendingDeleteMedia != null) {
+        DeleteMediaConfirmationDialog(
+            mediaItem = pendingDeleteMedia!!,
+            onConfirm = { viewModel.confirmDeleteMedia() },
+            onDismiss = { viewModel.cancelDeleteMedia() }
+        )
     }
 
     // Full Screen Video Player Overlay

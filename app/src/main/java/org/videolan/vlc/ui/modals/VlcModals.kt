@@ -31,9 +31,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.videolan.vlc.BuildConfig
 import org.videolan.vlc.R
 import org.videolan.vlc.model.AspectRatioMode
 import org.videolan.vlc.model.MediaItem
+import org.videolan.vlc.model.MediaType
 import org.videolan.vlc.model.RepeatMode
 import org.videolan.vlc.model.SleepTimerValidationResult
 import org.videolan.vlc.model.formatPlaybackDuration
@@ -877,6 +879,75 @@ private fun InfoRow(label: String, value: String) {
 }
 
 @Composable
+fun DeleteMediaConfirmationDialog(
+    mediaItem: MediaItem,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isVideo = mediaItem.mediaType == MediaType.VIDEO
+    val dialogTitle = if (isVideo) "Delete Video?" else "Delete Audio?"
+    val dialogMessage = "Are you sure you want to permanently delete \"${mediaItem.title}\" from your device?"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = dialogTitle,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.testTag("delete_confirm_dialog_title")
+            )
+        },
+        text = {
+            Text(
+                text = dialogMessage,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.testTag("delete_confirm_dialog_message")
+            )
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("delete_confirm_cancel_button")
+            ) {
+                Text(
+                    text = "Cancel",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                ),
+                modifier = Modifier.testTag("delete_confirm_delete_button")
+            ) {
+                Text(
+                    text = "Delete",
+                    color = MaterialTheme.colorScheme.onError,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+}
+
+@Composable
 fun AboutVlcDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -885,105 +956,34 @@ fun AboutVlcDialog(onDismiss: () -> Unit) {
                 painter = painterResource(id = R.drawable.ic_playmuse_logo),
                 contentDescription = "PLayMuse Logo",
                 modifier = Modifier
-                    .size(68.dp)
+                    .size(72.dp)
                     .clip(RoundedCornerShape(16.dp))
+                    .testTag("about_playmuse_logo")
             )
         },
         title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(
                     text = "PLayMuse",
                     fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.headlineSmall
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("about_playmuse_name")
                 )
                 Text(
-                    text = "com.dsc.playmuse • v3.6.0-playmuse",
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    text = "Version ${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
-                    )
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("about_playmuse_version")
                 )
-            }
-        },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Primary PLayMuse Project & Developer Attribution Card
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Developer: Naveed Mushtaq",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Copyright © 2026 DarkSkullCorporation",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = stringResource(id = R.string.about_playmuse_description),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                // Dedicated Open Source Licenses & Legal Notices Section
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Open Source Licenses & Legal Notices",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = stringResource(id = R.string.upstream_vlc_attribution),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Licensed under the GNU General Public License v2 or later (GPLv2+).",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
             }
         },
         confirmButton = {
@@ -992,7 +992,8 @@ fun AboutVlcDialog(onDismiss: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                ),
+                modifier = Modifier.testTag("about_close_button")
             ) {
                 Text("Close", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }

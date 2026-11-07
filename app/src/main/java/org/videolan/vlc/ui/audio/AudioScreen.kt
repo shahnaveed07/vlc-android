@@ -22,12 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.videolan.vlc.model.MediaItem
+import org.videolan.vlc.model.isEligibleLocalMediaStoreItem
 
 @Composable
 fun AudioScreen(
@@ -37,6 +39,7 @@ fun AudioScreen(
     onTrackClick: (MediaItem) -> Unit,
     onShuffleAll: () -> Unit,
     onShowInfo: (MediaItem) -> Unit,
+    onDeleteTrack: (MediaItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val categories = listOf("Tracks", "Artists", "Albums", "Genres")
@@ -143,7 +146,8 @@ fun AudioScreen(
                     AudioTrackItem(
                         track = track,
                         onClick = { onTrackClick(track) },
-                        onShowInfo = { onShowInfo(track) }
+                        onShowInfo = { onShowInfo(track) },
+                        onDelete = { onDeleteTrack(track) }
                     )
                 }
             }
@@ -155,14 +159,17 @@ fun AudioScreen(
 fun AudioTrackItem(
     track: MediaItem,
     onClick: () -> Unit,
-    onShowInfo: () -> Unit
+    onShowInfo: () -> Unit,
+    onDelete: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val canDelete = remember(track.uri, track.mediaType) { isEligibleLocalMediaStoreItem(track) }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .testTag("audio_track_item_${track.id}"),
         color = Color.Transparent
     ) {
         Row(
@@ -218,7 +225,10 @@ fun AudioTrackItem(
             )
 
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.testTag("audio_menu_button_${track.id}")
+                ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Options",
@@ -236,8 +246,32 @@ fun AudioTrackItem(
                         onClick = {
                             menuExpanded = false
                             onShowInfo()
-                        }
+                        },
+                        modifier = Modifier.testTag("audio_menu_details_${track.id}")
                     )
+                    if (canDelete) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Delete",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            },
+                            modifier = Modifier.testTag("audio_menu_delete_${track.id}")
+                        )
+                    }
                 }
             }
         }

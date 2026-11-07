@@ -146,7 +146,7 @@ fun SettingsScreen(
             Column {
                 SettingsClickableItem(
                     title = "About PLayMuse",
-                    subtitle = "Developer: Naveed Mushtaq • Copyright © 2026 DarkSkullCorporation",
+                    subtitle = "Application version information",
                     icon = Icons.Default.Info,
                     onClick = onOpenAbout
                 )

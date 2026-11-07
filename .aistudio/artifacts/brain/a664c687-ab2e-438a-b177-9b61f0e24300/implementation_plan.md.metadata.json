@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for Task 04: unified audio/video Playback Options panel, shared Sleep Timer with custom duration and monotonic second-accurate countdown, ExoPlayer PlayerMessage-backed A-B segment repeat, shared hour-aware duration formatting, and unit/Robolectric regression tests.",
-  "updatedAt": "2026-11-06T20:47:08.384740102Z",
+  "summary": "Implementation plan for Task 05: simplifying the About PLayMuse dialog to show only logo, name, and version (while preserving source/repository legal notices), and implementing real MediaStore device file deletion for Video and Audio libraries across API 26-36 with confirmation dialog, playback/queue safety, and regression tests.",
+  "updatedAt": "2026-11-06T21:08:26.825271336Z",
   "requestFeedback": true,
   "userFacing": true
 }

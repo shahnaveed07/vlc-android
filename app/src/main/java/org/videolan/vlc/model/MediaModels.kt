@@ -7,11 +7,78 @@
  */
 package org.videolan.vlc.model
 
+import android.content.ContentResolver
+import android.content.ContentUris
+import android.content.IntentSender
+import android.net.Uri
+import android.provider.MediaStore
 import java.util.Locale
 
 enum class MediaType {
     VIDEO,
     AUDIO
+}
+
+/**
+ * Validates that [uriString] is a genuine device-local Android MediaStore content URI
+ * (`content://media/.../video/media/{id}` or `content://media/.../audio/media/{id}`)
+ * with a positive numeric item ID.
+ *
+ * Rejects remote URLs (`http`, `https`, `rtsp`), file URIs, third-party authorities,
+ * table-level URIs without an item ID, and mismatched media types.
+ */
+fun parseValidMediaStoreUri(uriString: String, expectedType: MediaType? = null): Uri? {
+    if (uriString.isBlank()) return null
+    val uri = try {
+        Uri.parse(uriString)
+    } catch (_: Exception) {
+        null
+    } ?: return null
+
+    if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
+    if (uri.authority != MediaStore.AUTHORITY) return null
+
+    val path = uri.path ?: return null
+    val matchesType = when (expectedType) {
+        MediaType.VIDEO -> path.contains("/video/media/")
+        MediaType.AUDIO -> path.contains("/audio/media/")
+        null -> path.contains("/video/media/") || path.contains("/audio/media/")
+    }
+    if (!matchesType) return null
+
+    val itemId = try {
+        ContentUris.parseId(uri)
+    } catch (_: Exception) {
+        -1L
+    }
+    if (itemId <= 0L) return null
+
+    return uri
+}
+
+/**
+ * Returns true only if [item] represents a real device-local MediaStore video or audio entry
+ * eligible for permanent device deletion. Built-in remote sample items return false.
+ */
+fun isEligibleLocalMediaStoreItem(item: MediaItem): Boolean {
+    return parseValidMediaStoreUri(item.uri, item.mediaType) != null
+}
+
+/**
+ * Typed outcomes for device media deletion across Android 8.0 (API 26) through Android 16 (API 36).
+ */
+sealed class MediaDeleteResult {
+    data class Deleted(val mediaItem: MediaItem) : MediaDeleteResult()
+    data class RequiresSystemConsent(
+        val mediaItem: MediaItem,
+        val intentSender: IntentSender,
+        val requiresFollowUpDelete: Boolean
+    ) : MediaDeleteResult()
+    data class RequiresLegacyWritePermission(val mediaItem: MediaItem) : MediaDeleteResult()
+    data class Cancelled(val mediaItem: MediaItem) : MediaDeleteResult()
+    data class PermissionDenied(val mediaItem: MediaItem, val message: String) : MediaDeleteResult()
+    data class NotFoundOrIneligible(val mediaItem: MediaItem, val message: String) : MediaDeleteResult()
+    data class Error(val mediaItem: MediaItem, val message: String) : MediaDeleteResult()
 }
 
 enum class RepeatMode {

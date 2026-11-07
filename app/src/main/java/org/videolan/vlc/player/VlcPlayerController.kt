@@ -365,6 +365,40 @@ class VlcPlayerController(
         _playbackError.value = null
     }
 
+    /**
+     * Safely cleans up playback and playlist state when a media item is deleted from the device.
+     * - Removes only the deleted item from [_playlist].
+     * - If the deleted item is currently loaded/playing, stops ExoPlayer, clears active media state,
+     *   and resets A–B repeat so no stale mini-player or full-screen player remains.
+     * - If a different item is playing, leaves active playback uninterrupted.
+     *
+     * @return true if the deleted item was the currently loaded/playing media item.
+     */
+    fun onMediaItemDeleted(deletedItem: MediaItem): Boolean {
+        val matchesDeleted: (MediaItem) -> Boolean = { candidate ->
+            candidate.id == deletedItem.id || candidate.uri == deletedItem.uri
+        }
+
+        _playlist.value = _playlist.value.filterNot(matchesDeleted)
+
+        val current = _currentMedia.value
+        if (current != null && matchesDeleted(current)) {
+            cancelAbLoopPlayerMessage()
+            clearAbLoop()
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+            _isPlaying.value = false
+            _currentMedia.value = null
+            _currentPosition.value = 0L
+            _duration.value = 0L
+            _playbackError.value = null
+            _isCurrentMediaSeekable.value = false
+            customSeekableOverride = null
+            return true
+        }
+        return false
+    }
+
     fun playQueue(items: List<MediaItem>, startIndex: Int = 0) {
         if (items.isEmpty()) return
         _playlist.value = items

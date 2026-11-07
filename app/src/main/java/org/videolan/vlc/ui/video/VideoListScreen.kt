@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import org.videolan.vlc.R
 import org.videolan.vlc.model.MediaItem
+import org.videolan.vlc.model.isEligibleLocalMediaStoreItem
 import org.videolan.vlc.theme.PlayMuseGoldDeep
 import org.videolan.vlc.theme.PlayMuseTextPrimaryDark
 
@@ -45,6 +47,7 @@ fun VideoListScreen(
     onVideoClick: (MediaItem) -> Unit,
     onPlayAsAudio: (MediaItem) -> Unit,
     onShowInfo: (MediaItem) -> Unit,
+    onDeleteVideo: (MediaItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (videos.isEmpty()) {
@@ -86,7 +89,8 @@ fun VideoListScreen(
                     video = video,
                     onClick = { onVideoClick(video) },
                     onPlayAsAudio = { onPlayAsAudio(video) },
-                    onShowInfo = { onShowInfo(video) }
+                    onShowInfo = { onShowInfo(video) },
+                    onDelete = { onDeleteVideo(video) }
                 )
             }
         }
@@ -101,7 +105,8 @@ fun VideoListScreen(
                     video = video,
                     onClick = { onVideoClick(video) },
                     onPlayAsAudio = { onPlayAsAudio(video) },
-                    onShowInfo = { onShowInfo(video) }
+                    onShowInfo = { onShowInfo(video) },
+                    onDelete = { onDeleteVideo(video) }
                 )
             }
         }
@@ -113,15 +118,18 @@ fun VideoGridCard(
     video: MediaItem,
     onClick: () -> Unit,
     onPlayAsAudio: () -> Unit,
-    onShowInfo: () -> Unit
+    onShowInfo: () -> Unit,
+    onDelete: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val canDelete = remember(video.uri, video.mediaType) { isEligibleLocalMediaStoreItem(video) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .testTag("video_grid_card_${video.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -224,7 +232,9 @@ fun VideoGridCard(
                 Box {
                     IconButton(
                         onClick = { menuExpanded = true },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("video_menu_button_${video.id}")
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
@@ -244,7 +254,8 @@ fun VideoGridCard(
                             onClick = {
                                 menuExpanded = false
                                 onPlayAsAudio()
-                            }
+                            },
+                            modifier = Modifier.testTag("video_menu_play_as_audio_${video.id}")
                         )
                         DropdownMenuItem(
                             text = { Text("Information") },
@@ -252,8 +263,32 @@ fun VideoGridCard(
                             onClick = {
                                 menuExpanded = false
                                 onShowInfo()
-                            }
+                            },
+                            modifier = Modifier.testTag("video_menu_info_${video.id}")
                         )
+                        if (canDelete) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "Delete",
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDelete()
+                                },
+                                modifier = Modifier.testTag("video_menu_delete_${video.id}")
+                            )
+                        }
                     }
                 }
             }
@@ -266,15 +301,18 @@ fun VideoListRow(
     video: MediaItem,
     onClick: () -> Unit,
     onPlayAsAudio: () -> Unit,
-    onShowInfo: () -> Unit
+    onShowInfo: () -> Unit,
+    onDelete: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val canDelete = remember(video.uri, video.mediaType) { isEligibleLocalMediaStoreItem(video) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .testTag("video_list_row_${video.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -366,7 +404,10 @@ fun VideoListRow(
             }
 
             Box {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.testTag("video_menu_button_${video.id}")
+                ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Options",
@@ -384,7 +425,8 @@ fun VideoListRow(
                         onClick = {
                             menuExpanded = false
                             onPlayAsAudio()
-                        }
+                        },
+                        modifier = Modifier.testTag("video_menu_play_as_audio_${video.id}")
                     )
                     DropdownMenuItem(
                         text = { Text("Information") },
@@ -392,8 +434,32 @@ fun VideoListRow(
                         onClick = {
                             menuExpanded = false
                             onShowInfo()
-                        }
+                        },
+                        modifier = Modifier.testTag("video_menu_info_${video.id}")
                     )
+                    if (canDelete) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Delete",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            },
+                            modifier = Modifier.testTag("video_menu_delete_${video.id}")
+                        )
+                    }
                 }
             }
         }
