@@ -44,6 +44,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.RepeatMode
+import org.videolan.vlc.model.formatAbTimestamp
 import org.videolan.vlc.model.formatPlaybackDuration
 
 @OptIn(UnstableApi::class)
@@ -132,6 +133,9 @@ class VlcPlayerController(
 
     private var abLoopMediaId: String? = null
     private var abLoopPlayerMessage: PlayerMessage? = null
+    private var loopGeneration: Long = 0L
+    private var isBoundarySeekPending = false
+    private var lastBoundaryHandledTimeMs: Long = 0L
     private var isRetryingSameMedia: Boolean = false
     private var customSeekableOverride: Boolean? = null
     private var codecRecoveryAttempted: Boolean = false
@@ -306,13 +310,23 @@ class VlcPlayerController(
 
     fun onPlaybackPositionUpdated(positionMs: Long) {
         val safePos = positionMs.coerceAtLeast(0L)
-        _currentPosition.value = safePos
         if (_isAbLoopActive.value && _currentMedia.value?.id == abLoopMediaId) {
+            val aPos = _abPointAMs.value
             val bPos = _abPointBMs.value
-            if (bPos != null && safePos >= bPos) {
-                onAbLoopBoundaryReached(abLoopMediaId)
+            if (bPos != null && aPos != null) {
+                if (safePos < bPos) {
+                    isBoundarySeekPending = false
+                    _currentPosition.value = safePos
+                } else if (!isBoundarySeekPending) {
+                    _currentPosition.value = safePos
+                    onAbLoopBoundaryReached(abLoopMediaId, source = "PositionUpdaterFallback")
+                }
+                return
             }
+        } else {
+            isBoundarySeekPending = false
         }
+        _currentPosition.value = safePos
     }
 
     fun playMedia(item: MediaItem, queue: List<MediaItem>? = null) {
@@ -459,6 +473,20 @@ class VlcPlayerController(
         return _isCurrentMediaSeekable.value
     }
 
+    companion object {
+        const val MIN_LOOP_INTERVAL_MS = 500L
+    }
+
+    private fun formatDisplayTime(ms: Long): String {
+        return if (ms % 1000L == 0L) formatPlaybackDuration(ms) else formatAbTimestamp(ms)
+    }
+
+    private fun formatLoopStatusMessage(aPos: Long, bPos: Long): String {
+        val aStr = formatDisplayTime(aPos)
+        val bStr = formatDisplayTime(bPos)
+        return "Loop: $aStr – $bStr"
+    }
+
     fun setPointA(positionMs: Long = currentPlaybackPositionMs()): Boolean {
         if (!canUseAbRepeat()) {
             _abLoopErrorMessage.value = "A–B repeat is only available for seekable media with a known finite duration."
@@ -467,7 +495,7 @@ class VlcPlayerController(
         }
 
         val dur = resolveEffectiveDurationMs()
-        if (positionMs < 0L || positionMs >= dur) {
+        if (positionMs < 0L || (dur > 0L && positionMs >= dur)) {
             _abLoopErrorMessage.value = "Point A must be within the media duration (00:00 – ${formatPlaybackDuration(dur)})."
             return false
         }
@@ -480,19 +508,19 @@ class VlcPlayerController(
         abLoopMediaId = currentId
         _abLoopErrorMessage.value = null
 
-        if (existingB != null && positionMs >= existingB) {
+        if (existingB != null && (positionMs >= existingB || existingB - positionMs < MIN_LOOP_INTERVAL_MS)) {
             cancelAbLoopPlayerMessage()
             _abPointBMs.value = null
             _isAbPointBSelected.value = false
             _isAbLoopActive.value = false
-            _abLoopStatusMessage.value = "A: ${formatPlaybackDuration(positionMs)} • Waiting to set B"
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(positionMs)} • Waiting to set B"
         } else if (existingB != null && _isAbLoopActive.value) {
-            _abLoopStatusMessage.value = "Loop: ${formatPlaybackDuration(positionMs)} – ${formatPlaybackDuration(existingB)}"
+            _abLoopStatusMessage.value = formatLoopStatusMessage(positionMs, existingB)
             scheduleAbLoopPlayerMessage()
         } else if (existingB != null) {
-            _abLoopStatusMessage.value = "A: ${formatPlaybackDuration(positionMs)} • B: ${formatPlaybackDuration(existingB)}"
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(positionMs)} • B: ${formatDisplayTime(existingB)}"
         } else {
-            _abLoopStatusMessage.value = "A: ${formatPlaybackDuration(positionMs)} • Waiting to set B"
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(positionMs)} • Waiting to set B"
         }
         return true
     }
@@ -514,12 +542,17 @@ class VlcPlayerController(
 
         val dur = resolveEffectiveDurationMs()
         if (positionMs <= aPos) {
-            _abLoopErrorMessage.value = "Point B (${formatPlaybackDuration(positionMs)}) must be later than Point A (${formatPlaybackDuration(aPos)})."
-            _abLoopStatusMessage.value = "A: ${formatPlaybackDuration(aPos)} • Set B after ${formatPlaybackDuration(aPos)}"
+            _abLoopErrorMessage.value = "Point B (${formatDisplayTime(positionMs)}) must be later than Point A (${formatDisplayTime(aPos)})."
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(aPos)} • Set B after ${formatDisplayTime(aPos)}"
             return false
         }
 
-        if (positionMs > dur) {
+        if (positionMs - aPos < MIN_LOOP_INTERVAL_MS) {
+            _abLoopErrorMessage.value = "Loop interval must be at least ${MIN_LOOP_INTERVAL_MS}ms."
+            return false
+        }
+
+        if (dur > 0L && positionMs > dur) {
             _abLoopErrorMessage.value = "Point B cannot exceed media duration (${formatPlaybackDuration(dur)})."
             return false
         }
@@ -542,15 +575,22 @@ class VlcPlayerController(
         val bPos = _abPointBMs.value
         val dur = resolveEffectiveDurationMs()
 
-        if (aPos == null || bPos == null || abLoopMediaId != currentId || aPos < 0L || bPos <= aPos || bPos > dur) {
+        if (aPos == null || bPos == null || abLoopMediaId != currentId || aPos < 0L || bPos <= aPos || (dur > 0L && bPos > dur)) {
             _abLoopErrorMessage.value = "Set valid Point A and Point B (with B after A) to activate loop."
+            _isAbLoopActive.value = false
+            return false
+        }
+
+        if (bPos - aPos < MIN_LOOP_INTERVAL_MS) {
+            _abLoopErrorMessage.value = "Loop interval must be at least ${MIN_LOOP_INTERVAL_MS}ms."
             _isAbLoopActive.value = false
             return false
         }
 
         _isAbLoopActive.value = true
         _abLoopErrorMessage.value = null
-        _abLoopStatusMessage.value = "Loop: ${formatPlaybackDuration(aPos)} – ${formatPlaybackDuration(bPos)}"
+        _abLoopStatusMessage.value = formatLoopStatusMessage(aPos, bPos)
+        isBoundarySeekPending = false
         scheduleAbLoopPlayerMessage()
 
         val currentPos = currentPlaybackPositionMs()
@@ -558,6 +598,29 @@ class VlcPlayerController(
             seekToInternal(aPos)
         }
         return true
+    }
+
+    fun pauseAbLoop(): Boolean {
+        if (!_isAbLoopActive.value) return false
+        cancelAbLoopPlayerMessage()
+        _isAbLoopActive.value = false
+        isBoundarySeekPending = false
+        val aPos = _abPointAMs.value
+        val bPos = _abPointBMs.value
+        if (aPos != null && bPos != null) {
+            _abLoopStatusMessage.value = "Loop paused (${formatDisplayTime(aPos)} – ${formatDisplayTime(bPos)})"
+        } else {
+            _abLoopStatusMessage.value = "Loop paused"
+        }
+        return true
+    }
+
+    fun toggleAbLoop(): Boolean {
+        return if (_isAbLoopActive.value) {
+            pauseAbLoop()
+        } else {
+            activateAbLoop()
+        }
     }
 
     fun clearAbLoop() {
@@ -569,11 +632,92 @@ class VlcPlayerController(
         _isAbLoopActive.value = false
         _abLoopErrorMessage.value = null
         abLoopMediaId = null
+        isBoundarySeekPending = false
         _abLoopStatusMessage.value = if (canUseAbRepeat() || _currentMedia.value == null) {
             "Waiting to set A"
         } else {
             "A–B repeat is unavailable for live or unseekable media"
         }
+    }
+
+    fun jumpToPointA() {
+        val aPos = _abPointAMs.value ?: return
+        isBoundarySeekPending = false
+        seekToInternal(aPos)
+        if (_isAbLoopActive.value) {
+            scheduleAbLoopPlayerMessage()
+        }
+    }
+
+    fun jumpToPointB() {
+        val bPos = _abPointBMs.value ?: return
+        val aPos = _abPointAMs.value ?: 0L
+        isBoundarySeekPending = false
+        if (_isAbLoopActive.value) {
+            val previewPos = (bPos - 2000L).coerceAtLeast(aPos)
+            seekToInternal(previewPos)
+            scheduleAbLoopPlayerMessage()
+        } else {
+            seekToInternal(bPos)
+        }
+    }
+
+    fun adjustPointA(deltaMs: Long): Boolean {
+        val aPos = _abPointAMs.value ?: return false
+        val newA = aPos + deltaMs
+        val dur = resolveEffectiveDurationMs()
+        if (newA < 0L || (dur > 0L && newA >= dur)) {
+            _abLoopErrorMessage.value = "Point A must remain within media duration."
+            return false
+        }
+        val bPos = _abPointBMs.value
+        if (bPos != null && newA + MIN_LOOP_INTERVAL_MS > bPos) {
+            _abLoopErrorMessage.value = "Point A must be at least ${MIN_LOOP_INTERVAL_MS}ms before Point B."
+            return false
+        }
+        _abPointAMs.value = newA
+        _abLoopErrorMessage.value = null
+        if (bPos != null && _isAbLoopActive.value) {
+            _abLoopStatusMessage.value = formatLoopStatusMessage(newA, bPos)
+            scheduleAbLoopPlayerMessage()
+            val curPos = currentPlaybackPositionMs()
+            if (curPos < newA) {
+                seekToInternal(newA)
+            }
+        } else if (bPos != null) {
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(newA)} • B: ${formatDisplayTime(bPos)}"
+        } else {
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(newA)} • Waiting to set B"
+        }
+        return true
+    }
+
+    fun adjustPointB(deltaMs: Long): Boolean {
+        val bPos = _abPointBMs.value ?: return false
+        val aPos = _abPointAMs.value ?: return false
+        val newB = bPos + deltaMs
+        val dur = resolveEffectiveDurationMs()
+        if (dur > 0L && newB > dur) {
+            _abLoopErrorMessage.value = "Point B cannot exceed media duration."
+            return false
+        }
+        if (newB < aPos + MIN_LOOP_INTERVAL_MS) {
+            _abLoopErrorMessage.value = "Point B must be at least ${MIN_LOOP_INTERVAL_MS}ms after Point A."
+            return false
+        }
+        _abPointBMs.value = newB
+        _abLoopErrorMessage.value = null
+        if (_isAbLoopActive.value) {
+            _abLoopStatusMessage.value = formatLoopStatusMessage(aPos, newB)
+            scheduleAbLoopPlayerMessage()
+            val curPos = currentPlaybackPositionMs()
+            if (curPos >= newB) {
+                onAbLoopBoundaryReached(abLoopMediaId, source = "AdjustB")
+            }
+        } else {
+            _abLoopStatusMessage.value = "A: ${formatDisplayTime(aPos)} • B: ${formatDisplayTime(newB)}"
+        }
+        return true
     }
 
     private fun scheduleAbLoopPlayerMessage() {
@@ -583,14 +727,15 @@ class VlcPlayerController(
         val targetMediaId = abLoopMediaId ?: _currentMedia.value?.id ?: return
         if (!_isAbLoopActive.value || bPos <= aPos) return
 
+        val currentGen = ++loopGeneration
         try {
             val message = exoPlayer.createMessage { _, _ ->
-                onAbLoopBoundaryReached(targetMediaId)
+                onAbLoopBoundaryReached(targetMediaId, generation = currentGen, source = "PlayerMessage")
             }
             val mediaItemIndex = exoPlayer.currentMediaItemIndex.coerceAtLeast(0)
             message.setLooper(Looper.getMainLooper())
             message.setPosition(mediaItemIndex, bPos)
-            message.setDeleteAfterDelivery(false)
+            message.setDeleteAfterDelivery(true)
             message.send()
             abLoopPlayerMessage = message
         } catch (e: Exception) {
@@ -599,6 +744,7 @@ class VlcPlayerController(
     }
 
     private fun cancelAbLoopPlayerMessage() {
+        loopGeneration++
         try {
             abLoopPlayerMessage?.cancel()
         } catch (e: Exception) {
@@ -608,14 +754,27 @@ class VlcPlayerController(
         }
     }
 
-    fun onAbLoopBoundaryReached(expectedMediaId: String? = abLoopMediaId) {
+    fun onAbLoopBoundaryReached(
+        expectedMediaId: String? = abLoopMediaId,
+        generation: Long? = null,
+        source: String = "Direct"
+    ) {
         if (!_isAbLoopActive.value) return
         val currentId = _currentMedia.value?.id ?: return
         if (expectedMediaId == null || currentId != expectedMediaId) return
 
+        if (generation != null && generation != loopGeneration) return
+
         val aPos = _abPointAMs.value ?: return
         val bPos = _abPointBMs.value ?: return
         if (bPos <= aPos) return
+
+        if (isBoundarySeekPending) {
+            return
+        }
+
+        isBoundarySeekPending = true
+        lastBoundaryHandledTimeMs = elapsedRealtimeMs()
 
         val wasPlaying = _isPlaying.value || exoPlayer.isPlaying
         seekToInternal(aPos)
@@ -626,6 +785,8 @@ class VlcPlayerController(
             exoPlayer.pause()
             _isPlaying.value = false
         }
+
+        scheduleAbLoopPlayerMessage()
     }
 
     private fun seekToInternal(positionMs: Long) {
@@ -641,13 +802,19 @@ class VlcPlayerController(
         if (_isAbLoopActive.value && _currentMedia.value?.id == abLoopMediaId) {
             val aPos = _abPointAMs.value
             val bPos = _abPointBMs.value
-            if (aPos != null && bPos != null && safePos >= bPos) {
-                onAbLoopBoundaryReached(abLoopMediaId)
-                return
+            if (aPos != null && bPos != null) {
+                if (safePos < aPos || safePos >= bPos) {
+                    isBoundarySeekPending = false
+                    seekToInternal(aPos)
+                    scheduleAbLoopPlayerMessage()
+                    return
+                }
             }
+            isBoundarySeekPending = false
             seekToInternal(safePos)
             scheduleAbLoopPlayerMessage()
         } else {
+            isBoundarySeekPending = false
             seekToInternal(safePos)
         }
     }

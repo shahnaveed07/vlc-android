@@ -33,12 +33,15 @@ android {
         buildConfigField("String", "UPSTREAM_ATTRIBUTION", "\"VideoLAN / VLC Authors\"")
     }
 
+    val customDebugKeystore = file("${rootDir}/debug.keystore")
     signingConfigs {
-        create("debugConfig") {
-            storeFile = file("${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        if (customDebugKeystore.exists()) {
+            create("debugConfig") {
+                storeFile = customDebugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
@@ -51,7 +54,9 @@ android {
             )
         }
         debug {
-            signingConfig = signingConfigs.getByName("debugConfig")
+            if (customDebugKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
     }
 

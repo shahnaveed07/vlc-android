@@ -38,6 +38,7 @@ import org.videolan.vlc.model.MediaItem
 import org.videolan.vlc.model.MediaType
 import org.videolan.vlc.model.RepeatMode
 import org.videolan.vlc.model.SleepTimerValidationResult
+import org.videolan.vlc.model.formatAbTimestamp
 import org.videolan.vlc.model.formatPlaybackDuration
 import org.videolan.vlc.model.formatSleepTimerCountdown
 import org.videolan.vlc.model.validateCustomSleepTimerInput
@@ -312,7 +313,7 @@ fun AbSegmentSeekBarIndicators(
                     .height(16.dp)
                     .padding(horizontal = 8.dp)
             ) {
-                val widthDp = maxWidth
+                val widthDp = this.maxWidth
                 val aFrac = ((pointAMs ?: 0L).toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
                 val bFrac = pointBMs?.let { (it.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) }
 
@@ -423,6 +424,35 @@ fun AbSegmentSeekBarIndicators(
     }
 }
 
+@Composable
+private fun AbFineTuneChip(
+    label: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+            .height(28.dp)
+            .testTag(testTag)
+    ) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .wrapContentHeight(Alignment.CenterVertically)
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaybackOptionsSheet(
@@ -455,6 +485,12 @@ fun PlaybackOptionsSheet(
     onPreviousTrack: () -> Unit = {},
     onTogglePlayPause: () -> Unit = {},
     onNextTrack: () -> Unit = {},
+    // Precision & control callbacks
+    onJumpToA: () -> Unit = {},
+    onJumpToB: () -> Unit = {},
+    onAdjustA: (deltaMs: Long) -> Unit = {},
+    onAdjustB: (deltaMs: Long) -> Unit = {},
+    onToggleAbLoop: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -546,7 +582,7 @@ fun PlaybackOptionsSheet(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "A: ${pointAMs?.let { formatPlaybackDuration(it) } ?: "--:--"}",
+                            text = "A: ${pointAMs?.let { formatAbTimestamp(it) } ?: "--:--"}",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 color = if (pointAMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold
@@ -554,7 +590,7 @@ fun PlaybackOptionsSheet(
                             modifier = Modifier.testTag("ab_point_a_timestamp")
                         )
                         Text(
-                            text = "B: ${pointBMs?.let { formatPlaybackDuration(it) } ?: "--:--"}",
+                            text = "B: ${pointBMs?.let { formatAbTimestamp(it) } ?: "--:--"}",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 color = if (pointBMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold
@@ -583,6 +619,7 @@ fun PlaybackOptionsSheet(
                         )
                     }
 
+                    // Main Action Controls
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -598,7 +635,7 @@ fun PlaybackOptionsSheet(
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
                             Text("Set A", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
@@ -614,26 +651,36 @@ fun PlaybackOptionsSheet(
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
                             Text("Set B", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
-                        if (pointAMs != null && pointBMs != null && !isAbLoopActive) {
+                        if (pointAMs != null && pointBMs != null) {
                             Button(
-                                onClick = onActivateAbLoop,
+                                onClick = {
+                                    if (isAbLoopActive) {
+                                        onToggleAbLoop()
+                                    } else {
+                                        onActivateAbLoop()
+                                    }
+                                },
                                 enabled = isMediaSeekable,
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("ab_activate_loop_button"),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    containerColor = if (isAbLoopActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
                                 shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                             ) {
-                                Text("Activate", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(
+                                    text = if (isAbLoopActive) "Pause" else "Loop",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
                             }
                         }
 
@@ -645,9 +692,57 @@ fun PlaybackOptionsSheet(
                                 .testTag("ab_clear_loop_button"),
                             shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                         ) {
-                            Text("Clear Loop", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            Text("Clear Loop", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+                        }
+                    }
+
+                    // Precision controls for Point A
+                    if (pointAMs != null && isMediaSeekable) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onJumpToA,
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .testTag("ab_jump_a_button")
+                            ) {
+                                Text("Jump A", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            AbFineTuneChip(label = "-500ms", testTag = "ab_adjust_a_minus_500", modifier = Modifier.weight(1f)) { onAdjustA(-500L) }
+                            AbFineTuneChip(label = "-100ms", testTag = "ab_adjust_a_minus_100", modifier = Modifier.weight(1f)) { onAdjustA(-100L) }
+                            AbFineTuneChip(label = "+100ms", testTag = "ab_adjust_a_plus_100", modifier = Modifier.weight(1f)) { onAdjustA(100L) }
+                            AbFineTuneChip(label = "+500ms", testTag = "ab_adjust_a_plus_500", modifier = Modifier.weight(1f)) { onAdjustA(500L) }
+                        }
+                    }
+
+                    // Precision controls for Point B
+                    if (pointBMs != null && isMediaSeekable) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onJumpToB,
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .testTag("ab_jump_b_button")
+                            ) {
+                                Text("Jump B", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            AbFineTuneChip(label = "-500ms", testTag = "ab_adjust_b_minus_500", modifier = Modifier.weight(1f)) { onAdjustB(-500L) }
+                            AbFineTuneChip(label = "-100ms", testTag = "ab_adjust_b_minus_100", modifier = Modifier.weight(1f)) { onAdjustB(-100L) }
+                            AbFineTuneChip(label = "+100ms", testTag = "ab_adjust_b_plus_100", modifier = Modifier.weight(1f)) { onAdjustB(100L) }
+                            AbFineTuneChip(label = "+500ms", testTag = "ab_adjust_b_plus_500", modifier = Modifier.weight(1f)) { onAdjustB(500L) }
                         }
                     }
                 }

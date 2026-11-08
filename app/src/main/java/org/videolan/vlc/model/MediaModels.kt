@@ -119,6 +119,28 @@ fun formatPlaybackDuration(durationMs: Long, allowZero: Boolean = true): String 
 }
 
 /**
+ * Formats duration with sub-second tenths precision for A–B loop marker fine-tuning.
+ * Examples:
+ * - 45_000L -> "00:45.0"
+ * - 45_100L -> "00:45.1"
+ * - 5_400_000L -> "1:30:00.0"
+ */
+fun formatAbTimestamp(durationMs: Long): String {
+    if (durationMs < 0L) return "--:--"
+    val totalSeconds = durationMs / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    val millis = durationMs % 1000L
+    val tenths = (millis / 100L).coerceIn(0L, 9L)
+    return if (hours > 0L) {
+        String.format(Locale.US, "%d:%02d:%02d.%d", hours, minutes, seconds, tenths)
+    } else {
+        String.format(Locale.US, "%02d:%02d.%d", minutes, seconds, tenths)
+    }
+}
+
+/**
  * Formats remaining sleep timer seconds accurately so sub-minute values never display as "0m".
  * Examples:
  * - 942 -> "15:42"

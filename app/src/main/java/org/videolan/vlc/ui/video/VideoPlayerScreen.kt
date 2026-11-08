@@ -97,9 +97,10 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Dismiss HUD after delay
-    LaunchedEffect(hudText) {
-        if (hudText != null) {
+    // Dismiss HUD after delay once drag gesture completes
+    var isDraggingGesture by remember { mutableStateOf(false) }
+    LaunchedEffect(hudText, isDraggingGesture) {
+        if (!isDraggingGesture && hudText != null) {
             delay(1500)
             hudText = null
             hudIcon = null
@@ -144,35 +145,69 @@ fun VideoPlayerScreen(
             }
             .pointerInput(isLocked) {
                 if (!isLocked) {
-                    detectVerticalDragGestures { change, dragAmount ->
-                        val screenWidth = size.width
-                        val x = change.position.x
+                    var control: PlayerGestureHelper.GestureControl? = null
+                    var initialVolume = 0
+                    var initialBrightness = 0.5f
+                    var cumulativeUpwardPx = 0f
 
-                        if (x < screenWidth / 2) {
-                            // Brightness control (left half)
-                            val activity = context as? Activity
-                            activity?.let { act ->
-                                val lp = act.window.attributes
-                                val currentBright = if (lp.screenBrightness < 0f) 0.5f else lp.screenBrightness
-                                val newBright = (currentBright - (dragAmount / 800f)).coerceIn(0.01f, 1.0f)
-                                lp.screenBrightness = newBright
-                                act.window.attributes = lp
-                                hudText = "Brightness: ${(newBright * 100).toInt()}%"
-                                hudIcon = Icons.Default.BrightnessMedium
-                                hudPercentage = newBright
+                    detectVerticalDragGestures(
+                        onDragStart = { offset ->
+                            control = PlayerGestureHelper.determineControl(offset.x, size.width.toFloat())
+                            cumulativeUpwardPx = 0f
+                            isDraggingGesture = true
+                            if (control == PlayerGestureHelper.GestureControl.VOLUME) {
+                                initialVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                            } else {
+                                val activity = context as? Activity
+                                initialBrightness = PlayerGestureHelper.resolveInitialBrightness(activity)
                             }
-                        } else {
-                            // Volume control (right half)
-                            val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                            val delta = if (dragAmount < 0) 1 else -1
-                            val newVol = (currentVol + delta).coerceIn(0, maxVolume)
-                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, 0)
-                            val percent = newVol.toFloat() / maxVolume.toFloat()
-                            hudText = "Volume: ${(percent * 100).toInt()}%"
-                            hudIcon = if (newVol == 0) Icons.Default.VolumeOff else Icons.Default.VolumeUp
-                            hudPercentage = percent
+                        },
+                        onDragEnd = {
+                            control = null
+                            cumulativeUpwardPx = 0f
+                            isDraggingGesture = false
+                        },
+                        onDragCancel = {
+                            control = null
+                            cumulativeUpwardPx = 0f
+                            isDraggingGesture = false
+                        },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            cumulativeUpwardPx -= dragAmount
+                            if (control == PlayerGestureHelper.GestureControl.VOLUME) {
+                                val pxPerStep = PlayerGestureHelper.VOLUME_STEP_DP.dp.toPx()
+                                val targetVol = PlayerGestureHelper.calculateTargetVolume(
+                                    initialVolume = initialVolume,
+                                    maxVolume = maxVolume,
+                                    upwardDragPx = cumulativeUpwardPx,
+                                    pxPerStep = pxPerStep
+                                )
+                                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
+                                val actualVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                val pct = if (maxVolume > 0) actualVol.toFloat() / maxVolume.toFloat() else 0f
+                                hudText = "Volume: ${(pct * 100).toInt()}%"
+                                hudIcon = if (actualVol == 0) Icons.Default.VolumeOff else Icons.Default.VolumeUp
+                                hudPercentage = pct
+                            } else if (control == PlayerGestureHelper.GestureControl.BRIGHTNESS) {
+                                val fullRangePx = PlayerGestureHelper.BRIGHTNESS_FULL_RANGE_DP.dp.toPx()
+                                val targetBright = PlayerGestureHelper.calculateTargetBrightness(
+                                    initialBrightness = initialBrightness,
+                                    upwardDragPx = cumulativeUpwardPx,
+                                    fullRangePx = fullRangePx
+                                )
+                                val activity = context as? Activity
+                                activity?.let { act ->
+                                    val lp = act.window.attributes
+                                    lp.screenBrightness = targetBright
+                                    act.window.attributes = lp
+                                }
+                                hudText = "Brightness: ${(targetBright * 100).toInt()}%"
+                                hudIcon = Icons.Default.BrightnessMedium
+                                hudPercentage = targetBright
+                            }
                         }
-                    }
+                    )
                 }
             }
     ) {
@@ -634,6 +669,11 @@ fun VideoPlayerScreen(
             aspectRatioMode = aspectRatioMode,
             onCycleAspectRatio = onCycleAspectRatio,
             onLockControls = { isLocked = true },
+            onJumpToA = { playerController.jumpToPointA() },
+            onJumpToB = { playerController.jumpToPointB() },
+            onAdjustA = { delta -> playerController.adjustPointA(delta) },
+            onAdjustB = { delta -> playerController.adjustPointB(delta) },
+            onToggleAbLoop = { playerController.toggleAbLoop() },
             onDismiss = { showPlaybackOptions = false }
         )
     }
